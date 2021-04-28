@@ -1,3 +1,4 @@
 ADDR = "192.168.236.128"
 PORT = "7471"
 NAME = "rxe_0"
+TIMEOUT_IN_MS = 500

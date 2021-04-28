@@ -1,9 +1,10 @@
 # rdma server
 from pyverbs.qp import QPInitAttr, QPCap
-from pyverbs.cmid import CMID, AddrInfo, CMEventChannel,CMEvent
+from pyverbs.cmid import CMID, AddrInfo, CMEventChannel, CMEvent
 import pyverbs.cm_enums as ce
-from src.common import Context, Connection
+from pyverbs.mem_alloc import malloc
 import copy
+
 
 class RdmaServer:
     # sockaddr_in addr
@@ -15,24 +16,27 @@ class RdmaServer:
         cap = QPCap(max_recv_wr=max_recv_wr)
         qp_init_attr = QPInitAttr(cap=cap)
         self.addr_info = AddrInfo(src=addr, service=port, port_space=ce.RDMA_PS_TCP, flags=ce.RAI_PASSIVE)
-        self.listener = CMID(creator=self.addr_info, qp_init_attr=qp_init_attr)
-        self.ctx = Context(name=name)
-        self.conn = Connection(self.ctx.pd)
         self.event_channel = CMEventChannel()
-        self.event = None # event deep copy
+        self.listener = CMID(creator=self.event_channel, qp_init_attr=qp_init_attr)
+        self.event = None  # event deep copy
         print("ready to listen on ", addr + ":" + port)
 
     def run(self):
+        self.listener.bind_addr(self.addr_info)
         self.listener.listen(backlog=10)
         print("listening... ")
+        # new_id = self.listener.get_request()
+        # new_id.accept()
         while True:
             # block until the event come
-            event = CMEvent(channel=self.event_channel)
-            self.event = copy.deepcopy(event)
+            event = CMEvent(self.event_channel)
+            print(event.event_type)
+            # self.event = copy.deepcopy(event)
             event.ack_cm_event()
-            self.on_event()
+            # self.on_event()
 
     def on_event(self):
+        print(self.event.event_type)
         if self.event.event_type == ce.RDMA_CM_EVENT_CONNECT_REQUEST:
             print("connected")
 
@@ -42,5 +46,3 @@ class RdmaServer:
     def close(self):
         self.listener.close()
         self.addr_info.close()
-        self.ctx.close()
-        self.conn.close()
