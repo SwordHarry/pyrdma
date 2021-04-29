@@ -1,5 +1,4 @@
 # request struct and config
-import pyverbs.device as d
 from pyverbs.pd import PD
 from pyverbs.cq import CompChannel, CQ
 from pyverbs.mr import MR
@@ -17,7 +16,7 @@ class AddrResolvedContext:
         self.ctx = context
         self.pd = PD(self.ctx)
         self.comp_channel = CompChannel(self.ctx)
-        self.cq = CQ(self.ctx, 2, None, self.comp_channel, 0)
+        self.cq = CQ(self.ctx, 10, None, self.comp_channel, 0)
         self.cq.req_notify()
 
     def close(self):
