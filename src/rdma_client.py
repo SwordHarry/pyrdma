@@ -3,24 +3,21 @@
 import pyverbs.cm_enums as ce
 import pyverbs.enums as e
 # config
-import config.config as c
-from pyverbs.device import Context
-from pyverbs.qp import QPInitAttr, QPCap, QP
+import src.config.config as c
+# common
+from src.common.common import PollThread, die
+from src.common.node import Node
+# pyverbs
 from pyverbs.cq import CQ
-from pyverbs.cmid import CMID, AddrInfo, CMEventChannel, CMEvent, ConnParam
-from pyverbs.wr import RecvWR, SGE
-from src.common import GlobalContext, Connection, PollThread, die
-
-addr_res_ctx = None
+from pyverbs.cmid import CMEvent, ConnParam
 
 
 # TODO: complete the poll
-def _poll_cq():
-    global addr_res_ctx
+def _poll_cq(context):
     while True:
         # TODO: what is the ctx? None?
-        cq = CQ(addr_res_ctx.ctx, 10, None, addr_res_ctx.comp_channel, 0)
-        addr_res_ctx.comp_channel.get_cq_event(cq)
+        cq = CQ(context.ctx, 10, None, context.comp_channel, 0)
+        context.comp_channel.get_cq_event(cq)
         cq.ack_events(1)
         cq.req_notify()
         (npolled, wcs) = cq.poll(1)
@@ -42,17 +39,9 @@ def _on_completion(wc):
         die("on_completion: completion isn't a send or a receive")
 
 
-class RdmaClient:
+class RdmaClient(Node):
     def __init__(self, addr, port, name, options=c.OPTIONS):
-        # qp init
-        # src=addr, ,flags=ce.RAI_PASSIVE
-        self.options = options
-        self.addr_info = AddrInfo(dst=addr, service=port, port_space=ce.RDMA_PS_TCP)
-        # event_channel, cmid and event
-        self.event_channel = CMEventChannel()
-        self.cid = CMID(creator=self.event_channel)
-        self.ctx = Context(name=name)
-        self.event = None
+        super().__init__(addr, port, name, options=options)
 
         # poll cq
         self.poll_t = PollThread(task=_poll_cq)
@@ -83,30 +72,12 @@ class RdmaClient:
     # resolved addr
     def _on_addr_resolved(self):
         print("address resolved.")
-        global addr_res_ctx
-        if addr_res_ctx is not None:
-            if addr_res_ctx.ctx != self.ctx:
+        if self.s_ctx is not None:
+            if self.s_ctx.ctx != self.ctx:
                 die("cannot handle events in more than one context.")
             return
         # build_context
-        addr_res_ctx = GlobalContext(context=self.ctx)
-        # poll_cq
-        # self.poll_t.start()
-        # build_qp_attr
-        qp_options = self.options.get("qp_init")
-        cap = QPCap(max_send_wr=qp_options.get("max_send_wr"), max_recv_wr=qp_options.get("max_recv_wr"),
-                    max_send_sge=qp_options.get("max_send_sge"), max_recv_sge=qp_options.get("max_recv_sge"))
-        self.qp_init_attr = QPInitAttr(qp_type=qp_options.get("qp_type"), cap=cap, scq=addr_res_ctx.cq,
-                                       rcq=addr_res_ctx.cq)
-        # rdma_create_qp
-        self.qp = QP(addr_res_ctx.pd, self.qp_init_attr)
-
-        # register_memory
-        conn = Connection(pd=addr_res_ctx.pd, recv_flag=0)
-        # post_receives
-        sge = SGE(addr=id(conn.recv_region), length=c.BUFFER_SIZE, lkey=conn.recv_mr.lkey)
-        wr = RecvWR(num_sge=1, sg=[sge])
-        self.qp.post_recv(wr)
+        self.build_context()
         self.cid.resolve_route(c.TIMEOUT_IN_MS)
         return False
 
