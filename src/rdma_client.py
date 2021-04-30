@@ -5,33 +5,19 @@ import pyverbs.enums as e
 # config
 import src.config.config as c
 # common
-from src.common.common import PollThread, die
+from src.common.common import die
 from src.common.node import Node
+from src.common.common import PollThread
 # pyverbs
-from pyverbs.cq import CQ
 from pyverbs.cmid import CMEvent, ConnParam
 
 
-# TODO: complete the poll
-def _poll_cq(context):
-    while True:
-        # TODO: what is the ctx? None?
-        cq = CQ(context.ctx, 10, None, context.comp_channel, 0)
-        context.comp_channel.get_cq_event(cq)
-        cq.ack_events(1)
-        cq.req_notify()
-        (npolled, wcs) = cq.poll(1)
-        print("npolled:", npolled)
-        _on_completion(wcs[0])
-
-
-def _on_completion(wc):
-    conn = wc.wr_id
-    print(conn)
+def _client_on_completion(wc):
     if wc.status != e.IBV_WC_SUCCESS:
         die("on_completion: status is not IBV_WC_SUCCESS")
-
     if wc.opcode & e.IBV_WC_RECV:
+        conn = wc.wr_id
+        print(conn)
         print("received message:", conn.recv_region)
     elif wc.opcode == e.IBV_WC_SEND:
         print("send completed successfully")
@@ -43,8 +29,6 @@ class RdmaClient(Node):
     def __init__(self, addr, port, name, options=c.OPTIONS):
         super().__init__(addr, port, name, options=options)
 
-        # poll cq
-        self.poll_t = PollThread(task=_poll_cq)
         # event loop map config
         self.event_map = {
             ce.RDMA_CM_EVENT_ADDR_RESOLVED: self._on_addr_resolved,
@@ -76,7 +60,8 @@ class RdmaClient(Node):
             if self.s_ctx.ctx != self.ctx:
                 die("cannot handle events in more than one context.")
             return
-        # build_context
+        # poll cq
+        # self.build_context(self._poll_cq)
         self.build_context()
         self.cid.resolve_route(c.TIMEOUT_IN_MS)
         return False
@@ -87,3 +72,7 @@ class RdmaClient(Node):
         conn_param = ConnParam()
         self.cid.connect(conn_param)
         return False
+
+    def _poll_cq(self):
+        self.poll_t = PollThread(self.s_ctx, on_completion=_client_on_completion, thread_id=2)
+        self.poll_t.start()

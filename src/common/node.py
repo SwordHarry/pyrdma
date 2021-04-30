@@ -15,9 +15,10 @@ from pyverbs.wr import RecvWR, SGE
 # a common node for server or client
 
 class Node:
-    def __init__(self, addr, port, name, server_flag=False, options=c.OPTIONS):
+    def __init__(self, addr, port, name, is_server=False, options=c.OPTIONS):
         self.options = options
-        if server_flag:
+        self.is_server = is_server
+        if is_server:
             self.addr_info = AddrInfo(src=addr, service=port, port_space=ce.RDMA_PS_TCP, flags=ce.RAI_PASSIVE)
         else:
             self.addr_info = AddrInfo(dst=addr, service=port, port_space=ce.RDMA_PS_TCP)
@@ -28,9 +29,13 @@ class Node:
         self.event = None
         self.qp = None
 
-    def build_context(self):
-        # poll_cq
+    def build_context(self, poll_cq=None):
+        # build_context
         self.s_ctx = GlobalContext(context=self.ctx)
+        # poll_cq
+        # TODO: poll_Cq
+        if poll_cq is not None:
+            poll_cq()
         # build_qp_attr
         qp_options = self.options.get("qp_init")
         cap = QPCap(max_send_wr=qp_options.get("max_send_wr"), max_recv_wr=qp_options.get("max_recv_wr"),
