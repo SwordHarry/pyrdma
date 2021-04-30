@@ -1,4 +1,5 @@
 # request struct and config
+import config.config as c
 from pyverbs.pd import PD
 from pyverbs.cq import CompChannel, CQ
 from pyverbs.mr import MR
@@ -7,7 +8,7 @@ import threading
 
 
 # context of a request
-class AddrResolvedContext:
+class GlobalContext:
     # ibv_context ctx
     # ibv_pd pd
     # ibv_cq cq
@@ -31,9 +32,12 @@ class Connection:
     # ibv_qp qp
     # ibv_mr recv_mr
     # ibv_mr send_mr
-    def __init__(self, pd=None, recv_flag=e.IBV_ACCESS_REMOTE_READ, send_flag=e.IBV_ACCESS_LOCAL_WRITE, mr_len=1000):
+    def __init__(self, pd=None, recv_flag=e.IBV_ACCESS_REMOTE_READ, send_flag=e.IBV_ACCESS_LOCAL_WRITE,
+                 mr_len=c.BUFFER_SIZE):
         self.recv_mr = MR(pd, mr_len, recv_flag)
         self.send_mr = MR(pd, mr_len, send_flag)
+        self.recv_region = ""
+        self.send_region = ""
 
     def close(self):
         self.recv_mr.close()
