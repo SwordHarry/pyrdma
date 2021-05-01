@@ -56,10 +56,6 @@ class RdmaClient(Node):
     # resolved addr
     def _on_addr_resolved(self):
         print("address resolved.")
-        if self.s_ctx is not None:
-            if self.s_ctx.ctx != self.ctx:
-                die("cannot handle events in more than one context.")
-            return
         # poll cq
         # self.build_context(self._poll_cq)
         self.build_context()
@@ -74,5 +70,5 @@ class RdmaClient(Node):
         return False
 
     def _poll_cq(self):
-        self.poll_t = PollThread(self.s_ctx, on_completion=_client_on_completion, thread_id=2)
+        self.poll_t = PollThread(self.ctx, on_completion=_client_on_completion, thread_id=2)
         self.poll_t.start()

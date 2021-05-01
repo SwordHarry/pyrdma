@@ -51,10 +51,6 @@ class RdmaServer(Node):
 
     def _on_connect_request(self):
         print("received connection request")
-        if self.s_ctx is not None:
-            if self.s_ctx.ctx != self.ctx:
-                die("cannot handle events in more than one context.")
-            return
         # poll cq
         # self.build_context(self._poll_cq)
         self.build_context()
@@ -66,5 +62,5 @@ class RdmaServer(Node):
         self.addr_info.close()
 
     def _poll_cq(self):
-        self.poll_t = PollThread(self.s_ctx, on_completion=_server_on_completion, thread_id=2)
+        self.poll_t = PollThread(self.ctx, on_completion=_server_on_completion, thread_id=2)
         self.poll_t.start()
