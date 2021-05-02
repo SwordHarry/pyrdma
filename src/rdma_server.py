@@ -6,7 +6,6 @@ import pyverbs.enums as e
 # common
 from src.common.common import die
 from src.common.node import Node
-from src.common.common import PollThread
 # pyverbs
 from pyverbs.cmid import CMEvent, ConnParam
 
@@ -53,7 +52,7 @@ class RdmaServer(Node):
         print("received connection request")
         # poll cq
         # self.build_context(self._poll_cq)
-        self.build_context()
+        self.prepare_resource()
         conn_param = ConnParam()
         self.cid.accept(conn_param)
 
@@ -61,6 +60,3 @@ class RdmaServer(Node):
         self.cid.close()
         self.addr_info.close()
 
-    def _poll_cq(self):
-        self.poll_t = PollThread(self.ctx, on_completion=_server_on_completion, thread_id=2)
-        self.poll_t.start()

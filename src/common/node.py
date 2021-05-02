@@ -3,7 +3,6 @@ import pyverbs.cm_enums as ce
 # config
 import src.config.config as c
 # common
-from src.common.global_context import GlobalContext
 from src.common.connection import Connection
 # pyverbs
 from pyverbs.device import Context
@@ -29,20 +28,21 @@ class Node:
         self.cid = CMID(creator=self.event_channel)
         # rdma context
         self.ctx = Context(name=name)
-        # completion que
-        self.comp_channel = CompChannel(self.ctx)
-        self.cq = CQ(self.ctx, 10, None, self.comp_channel, 0)
-        # protection domains
-        self.pd = PD(self.ctx)
+        self.pd = None
+        self.comp_channel = None
+        self.cq = None
         self.event = None
         self.qp = None
 
-    def build_context(self, poll_cq=None):
-        # build_context
-        # poll_cq
-        # TODO: poll_Cq
-        if poll_cq is not None:
-            poll_cq()
+    def prepare_resource(self):
+        # pd, comp_channel, cq, qp
+
+        # protection domains
+        self.pd = PD(self.ctx)
+        # completion que
+        self.comp_channel = CompChannel(self.ctx)
+        self.cq = CQ(self.ctx, 10, None, self.comp_channel, 0)
+
         # build_qp_attr
         qp_options = self.options.get("qp_init")
         cap = QPCap(max_send_wr=qp_options.get("max_send_wr"), max_recv_wr=qp_options.get("max_recv_wr"),

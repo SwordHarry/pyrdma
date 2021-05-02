@@ -7,7 +7,6 @@ import src.config.config as c
 # common
 from src.common.common import die
 from src.common.node import Node
-from src.common.common import PollThread
 # pyverbs
 from pyverbs.cmid import CMEvent, ConnParam
 
@@ -42,12 +41,10 @@ class RdmaClient(Node):
         while True:
             self.event = CMEvent(self.event_channel)
             print(self.event.event_type, self.event.event_str())
-            # need to copy the event and then ack the event
-            # TODO: how to copy the event
-            if self.event_map[self.event.event_type]():
-                break
+            event_type = self.event.event_type
             self.event.ack_cm_event()
-        self.event.ack_cm_event()
+            if self.event_map[event_type]():
+                break
 
     def close(self):
         self.cid.close()
@@ -58,7 +55,7 @@ class RdmaClient(Node):
         print("address resolved.")
         # poll cq
         # self.build_context(self._poll_cq)
-        self.build_context()
+        self.prepare_resource()
         self.cid.resolve_route(c.TIMEOUT_IN_MS)
         return False
 
@@ -69,6 +66,3 @@ class RdmaClient(Node):
         self.cid.connect(conn_param)
         return False
 
-    def _poll_cq(self):
-        self.poll_t = PollThread(self.ctx, on_completion=_client_on_completion, thread_id=2)
-        self.poll_t.start()
