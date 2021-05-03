@@ -1,6 +1,6 @@
 import pyverbs.enums as e
 
-ADDR = "192.168.236.128"
+ADDR = "192.168.72.4"
 PORT = "7471"
 NAME = "rxe_0"
 TIMEOUT_IN_MS = 500

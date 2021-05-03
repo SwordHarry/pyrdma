@@ -7,7 +7,7 @@ import pyverbs.enums as e
 from src.common.common import die
 from src.common.node import Node
 # pyverbs
-from pyverbs.cmid import CMEvent, ConnParam
+from pyverbs.cmid import CMID,CMEvent, ConnParam
 
 
 def _server_on_completion(wc):
@@ -36,6 +36,7 @@ class RdmaServer(Node):
             ce.RDMA_CM_EVENT_CONNECT_REQUEST: self._on_connect_request,
 
         }
+        self.event_id = None
 
     def run(self):
         # bind_addr: will bind context and pd
@@ -46,6 +47,8 @@ class RdmaServer(Node):
             # block until the event come
             self.event = CMEvent(self.event_channel)
             print(self.event.event_type, self.event.event_str())
+            if self.event_id is None:
+                self.event_id = CMID(creator=self.event,listen_id=self.cid)
             self.event_map[self.event.event_type]()
             self.event.ack_cm_event()
 
@@ -53,7 +56,8 @@ class RdmaServer(Node):
         print("received connection request")
         self.prepare_resource()
         conn_param = ConnParam(resources=3, depth=3)
-        self.cid.accept(conn_param)
+        # TODO: accept not use the origin server cmid, have to use the cmid in the event
+        self.event_id.accept(conn_param)
         print("server accept")
 
     def close(self):
