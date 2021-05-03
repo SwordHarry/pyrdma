@@ -38,7 +38,7 @@ class Node:
         # pd, comp_channel, cq, qp
 
         # protection domains
-        self.pd = PD(self.cid)
+        self.pd = PD(self.cid.context)
         # completion que
         self.comp_channel = CompChannel(self.cid.context)
         cqe = self.options.get("cq_init").get("cqe")
@@ -48,17 +48,14 @@ class Node:
         qp_options = self.options.get("qp_init")
         cap = QPCap(max_send_wr=qp_options.get("max_send_wr"), max_recv_wr=qp_options.get("max_recv_wr"),
                     max_send_sge=qp_options.get("max_send_sge"), max_recv_sge=qp_options.get("max_recv_sge"))
-        qp_init_attr = QPInitAttr(qp_type=qp_options.get("qp_type"), cap=cap, scq=self.cq, rcq=self.cq)
-        # qp_attr = QPAttr(qp_state=e.IBV_QPS_INIT)
-        # self.qp = QP(self.cid.context, qp_init_attr, qp_attr)
-        print(qp_init_attr)
-        self.cid.create_qp(qp_init_attr)
+        qp_init_attr = QPInitAttr(qp_type=qp_options.get("qp_type"), qp_context=self.cid.context, cap=cap, scq=self.cq, rcq=self.cq)
+        qp_attr = QPAttr(qp_state=e.IBV_QPT_RC)
+        self.qp = QP(self.pd, qp_init_attr, qp_attr)
+        # self.cid.create_qp(qp_init_attr)
         # register_memory
-        self.conn = Connection(pd=self.pd, send_flag=0)
+        self.conn = Connection(pd=self.pd)
         # post_receives
         sge = SGE(addr=id(self.conn.recv_region), length=c.BUFFER_SIZE, lkey=self.conn.recv_mr.lkey)
         wr = RecvWR(num_sge=1, sg=[sge])
-        # 2init
-        # qp_attr = QPAttr(qp_state=e.IBV_QPS_INIT)
-        # self.qp.to_init(qp_attr)
-        self.cid.post_recv(self.conn.recv_mr)
+        self.qp.post_recv(wr)
+        # self.cid.post_recv(self.conn.recv_mr)

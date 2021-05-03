@@ -1,4 +1,4 @@
-from pyverbs.enums import IBV_QPT_RC
+import pyverbs.enums as e
 
 ADDR = "192.168.236.128"
 PORT = "7471"
@@ -8,7 +8,7 @@ BUFFER_SIZE = 1024
 
 OPTIONS = {
     "qp_init": {
-        "qp_type": IBV_QPT_RC,
+        "qp_type": e.IBV_QPT_RC,
         "max_send_wr": 4,
         "max_recv_wr": 4,
         "max_send_sge": 2,
