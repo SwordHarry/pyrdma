@@ -1,5 +1,6 @@
 # const
 import pyverbs.cm_enums as ce
+import pyverbs.enums as e
 # config
 import src.config.config as c
 # common
@@ -7,7 +8,7 @@ from src.common.connection import Connection
 # pyverbs
 from pyverbs.device import Context
 from pyverbs.cmid import CMID, AddrInfo, CMEventChannel
-from pyverbs.qp import QPInitAttr, QPCap, QP
+from pyverbs.qp import QPInitAttr, QPCap, QP, QPAttr
 from pyverbs.wr import RecvWR, SGE
 from pyverbs.cq import CompChannel, CQ
 from pyverbs.pd import PD
@@ -26,34 +27,38 @@ class Node:
         # cmid
         self.event_channel = CMEventChannel()
         self.cid = CMID(creator=self.event_channel)
-        # rdma context
-        self.ctx = Context(name=name)
         self.pd = None
         self.comp_channel = None
         self.cq = None
         self.event = None
         self.qp = None
+        self.conn = None
 
     def prepare_resource(self):
         # pd, comp_channel, cq, qp
 
         # protection domains
-        self.pd = PD(self.ctx)
+        self.pd = PD(self.cid)
         # completion que
-        self.comp_channel = CompChannel(self.ctx)
-        self.cq = CQ(self.ctx, 10, None, self.comp_channel, 0)
-
+        self.comp_channel = CompChannel(self.cid.context)
+        cqe = self.options.get("cq_init").get("cqe")
+        self.cq = CQ(self.cid.context, cqe, None, self.comp_channel, 0)
+        self.cq.req_notify()
         # build_qp_attr
         qp_options = self.options.get("qp_init")
         cap = QPCap(max_send_wr=qp_options.get("max_send_wr"), max_recv_wr=qp_options.get("max_recv_wr"),
                     max_send_sge=qp_options.get("max_send_sge"), max_recv_sge=qp_options.get("max_recv_sge"))
-        qp_init_attr = QPInitAttr(qp_type=qp_options.get("qp_type"), cap=cap, scq=self.cq,
-                                  rcq=self.cq)
-        # rdma_create_qp
-        self.qp = QP(self.pd, qp_init_attr)
+        qp_init_attr = QPInitAttr(qp_type=qp_options.get("qp_type"), cap=cap, scq=self.cq, rcq=self.cq)
+        # qp_attr = QPAttr(qp_state=e.IBV_QPS_INIT)
+        # self.qp = QP(self.cid.context, qp_init_attr, qp_attr)
+        print(qp_init_attr)
+        self.cid.create_qp(qp_init_attr)
         # register_memory
-        conn = Connection(pd=self.pd, send_flag=0)
+        self.conn = Connection(pd=self.pd, send_flag=0)
         # post_receives
-        sge = SGE(addr=id(conn.recv_region), length=c.BUFFER_SIZE, lkey=conn.recv_mr.lkey)
+        sge = SGE(addr=id(self.conn.recv_region), length=c.BUFFER_SIZE, lkey=self.conn.recv_mr.lkey)
         wr = RecvWR(num_sge=1, sg=[sge])
-        self.qp.post_recv(wr)
+        # 2init
+        # qp_attr = QPAttr(qp_state=e.IBV_QPS_INIT)
+        # self.qp.to_init(qp_attr)
+        self.cid.post_recv(self.conn.recv_mr)

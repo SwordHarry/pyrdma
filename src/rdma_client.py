@@ -32,12 +32,11 @@ class RdmaClient(Node):
         self.event_map = {
             ce.RDMA_CM_EVENT_ADDR_RESOLVED: self._on_addr_resolved,
             ce.RDMA_CM_EVENT_ROUTE_RESOLVED: self._on_route_resolved,
+            ce.RDMA_CM_EVENT_ESTABLISHED: self._on_connection,
         }
 
     def request(self):
         self.cid.resolve_addr(self.addr_info, c.TIMEOUT_IN_MS)
-        # self.cid.resolve_route()
-        # self.cid.connect()
         while True:
             self.event = CMEvent(self.event_channel)
             print(self.event.event_type, self.event.event_str())
@@ -53,16 +52,17 @@ class RdmaClient(Node):
     # resolved addr
     def _on_addr_resolved(self):
         print("address resolved.")
-        # poll cq
-        # self.build_context(self._poll_cq)
-        self.prepare_resource()
+        # resolve_route: will bind context and pd
         self.cid.resolve_route(c.TIMEOUT_IN_MS)
+        self.prepare_resource()
         return False
 
     # on_route_resolved
     def _on_route_resolved(self):
         print("route resolved.")
-        conn_param = ConnParam()
+        conn_param = ConnParam(resources=3, depth=3, retry=3)
         self.cid.connect(conn_param)
         return False
 
+    def _on_connection(self):
+        pass

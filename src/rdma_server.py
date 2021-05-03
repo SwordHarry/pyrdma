@@ -38,6 +38,7 @@ class RdmaServer(Node):
         }
 
     def run(self):
+        # bind_addr: will bind context and pd
         self.cid.bind_addr(self.addr_info)
         self.cid.listen(backlog=10)
         print("listening... ")
@@ -50,11 +51,10 @@ class RdmaServer(Node):
 
     def _on_connect_request(self):
         print("received connection request")
-        # poll cq
-        # self.build_context(self._poll_cq)
         self.prepare_resource()
-        conn_param = ConnParam()
+        conn_param = ConnParam(resources=3, depth=3)
         self.cid.accept(conn_param)
+        print("server accept")
 
     def close(self):
         self.cid.close()
