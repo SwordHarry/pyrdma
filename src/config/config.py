@@ -16,5 +16,5 @@ OPTIONS = {
     },
     "cq_init": {
         "cqe": 8
-    }
+    },
 }

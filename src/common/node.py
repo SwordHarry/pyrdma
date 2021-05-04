@@ -3,13 +3,10 @@ import pyverbs.cm_enums as ce
 import pyverbs.enums as e
 # config
 import src.config.config as c
-# common
-from src.common.connection import Connection
-# pyverbs
-from pyverbs.device import Context
+# pyverbss
 from pyverbs.cmid import CMID, AddrInfo, CMEventChannel
-from pyverbs.qp import QPInitAttr, QPCap, QP, QPAttr
-from pyverbs.wr import RecvWR, SGE
+from pyverbs.qp import QPInitAttr, QPCap
+from pyverbs.mr import MR
 from pyverbs.cq import CompChannel, CQ
 from pyverbs.pd import PD
 
@@ -34,6 +31,9 @@ class Node:
         self.event = None
         self.qp = None
         self.conn = None
+        self.recv_mr = None
+        # mr
+        self.metadata_recv_mr = None
 
     # if a server, here cmid is an event id; if a client, here cmid is it's cid
     def prepare_resource(self, cmid):
@@ -43,22 +43,22 @@ class Node:
         self.pd = PD(cmid.context)
         # comp_channel cq
         self.comp_channel = CompChannel(cmid.context)
-        cqe = self.options.get("cq_init").get("cqe")
+        cqe = self.options["cq_init"]["cqe"]
         self.cq = CQ(cmid.context, cqe, None, self.comp_channel, 0)
         self.cq.req_notify()
 
         # build_qp_attr
-        qp_options = self.options.get("qp_init")
-        cap = QPCap(max_send_wr=qp_options.get("max_send_wr"), max_recv_wr=qp_options.get("max_recv_wr"),
-                    max_send_sge=qp_options.get("max_send_sge"), max_recv_sge=qp_options.get("max_recv_sge"))
-        qp_init_attr = QPInitAttr(qp_type=qp_options.get("qp_type"), qp_context=cmid.context,
+        qp_options = self.options["qp_init"]
+        cap = QPCap(max_send_wr=qp_options["max_send_wr"], max_recv_wr=qp_options["max_recv_wr"],
+                    max_send_sge=qp_options["max_send_sge"], max_recv_sge=qp_options["max_recv_sge"])
+        qp_init_attr = QPInitAttr(qp_type=qp_options["qp_type"], qp_context=cmid.context,
                                   cap=cap, scq=self.cq, rcq=self.cq)
-
         # create_qp and bind in cmid
         cmid.create_qp(qp_init_attr)
-        self.conn = Connection(pd=self.pd)
-        cmid.post_recv(self.conn.recv_mr)
-
+        # memory region
+        # metadata_recv_mr: receive the metadata from other node
+        self.metadata_recv_mr = MR(self.pd, c.BUFFER_SIZE, e.IBV_ACCESS_LOCAL_WRITE)
+        cmid.post_recv(self.metadata_recv_mr)
         # create_qp alone
         # qp_attr = QPAttr(qp_state=e.IBV_QPT_RC)
         # QP
@@ -74,6 +74,9 @@ class Node:
         self.cq.req_notify()
         (npolled, wcs) = self.cq.poll()
         print(npolled, wcs)
-        # for wc in wcs:
-        #     if wc.status !=
+        if npolled > 0:
+            for wc in wcs:
+                if wc.status != e.IBV_WC_SUCCESS:
+                    print(wc)
+            self.cq.ack_events(npolled)
 

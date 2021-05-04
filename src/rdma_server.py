@@ -49,6 +49,7 @@ class RdmaServer(Node):
             self.event = CMEvent(self.event_channel)
             print(self.event.event_type, self.event.event_str())
             if self.event_id is None:
+                # next all action is done by this event_id, not cid
                 self.event_id = CMID(creator=self.event, listen_id=self.cid)
             self.event_map[self.event.event_type]()
             self.event.ack_cm_event()
@@ -66,7 +67,7 @@ class RdmaServer(Node):
         self.process_work_completion_events()
 
     def _on_rejected(self):
-        print(self.event_id.context)
+        self.close()
         print("rejected?!")
 
     def close(self):
