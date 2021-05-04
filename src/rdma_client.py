@@ -32,7 +32,7 @@ class RdmaClient(Node):
         self.event_map = {
             ce.RDMA_CM_EVENT_ADDR_RESOLVED: self._on_addr_resolved,
             ce.RDMA_CM_EVENT_ROUTE_RESOLVED: self._on_route_resolved,
-            ce.RDMA_CM_EVENT_ESTABLISHED: self._on_connection,
+            ce.RDMA_CM_EVENT_ESTABLISHED: self._on_established,
         }
 
     def request(self):
@@ -45,16 +45,12 @@ class RdmaClient(Node):
             if self.event_map[event_type]():
                 break
 
-    def close(self):
-        self.cid.close()
-        self.addr_info.close()
-
     # resolved addr
     def _on_addr_resolved(self):
         print("address resolved.")
         # resolve_route: will bind context and pd
         self.cid.resolve_route(c.TIMEOUT_IN_MS)
-        self.prepare_resource()
+        self.prepare_resource(self.cid)
         return False
 
     # on_route_resolved
@@ -64,5 +60,11 @@ class RdmaClient(Node):
         self.cid.connect(conn_param)
         return False
 
-    def _on_connection(self):
-        pass
+    def _on_established(self):
+        # need to exchange meta data with server
+
+
+
+    def close(self):
+        self.cid.close()
+        self.addr_info.close()

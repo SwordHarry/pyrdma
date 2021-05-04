@@ -7,7 +7,7 @@ import pyverbs.enums as e
 from src.common.common import die
 from src.common.node import Node
 # pyverbs
-from pyverbs.cmid import CMID,CMEvent, ConnParam
+from pyverbs.cmid import CMID, CMEvent, ConnParam
 
 
 def _server_on_completion(wc):
@@ -34,7 +34,8 @@ class RdmaServer(Node):
         # event loop map config
         self.event_map = {
             ce.RDMA_CM_EVENT_CONNECT_REQUEST: self._on_connect_request,
-
+            ce.RDMA_CM_EVENT_ESTABLISHED: self._on_established,
+            ce.RDMA_CM_EVENT_REJECTED: self._on_rejected,
         }
         self.event_id = None
 
@@ -48,17 +49,25 @@ class RdmaServer(Node):
             self.event = CMEvent(self.event_channel)
             print(self.event.event_type, self.event.event_str())
             if self.event_id is None:
-                self.event_id = CMID(creator=self.event,listen_id=self.cid)
+                self.event_id = CMID(creator=self.event, listen_id=self.cid)
             self.event_map[self.event.event_type]()
             self.event.ack_cm_event()
 
     def _on_connect_request(self):
         print("received connection request")
-        self.prepare_resource()
+        self.prepare_resource(self.event_id)
         conn_param = ConnParam(resources=3, depth=3)
-        # TODO: accept not use the origin server cmid, have to use the cmid in the event
+        # accept not use the origin server cmid, have to use the cmid in the events
         self.event_id.accept(conn_param)
         print("server accept")
+
+    def _on_established(self):
+        # need to poll cq and ack
+        self.process_work_completion_events()
+
+    def _on_rejected(self):
+        print(self.event_id.context)
+        print("rejected?!")
 
     def close(self):
         self.cid.close()

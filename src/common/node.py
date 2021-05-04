@@ -22,8 +22,9 @@ class Node:
         self.is_server = is_server
         if is_server:
             self.addr_info = AddrInfo(src=addr, service=port, port_space=ce.RDMA_PS_TCP, flags=ce.RAI_PASSIVE)
+            print(ce.RDMA_PS_TCP, ce.RAI_PASSIVE)
         else:
-            self.addr_info = AddrInfo(dst=addr, service=port, port_space=ce.RDMA_PS_TCP)
+            self.addr_info = AddrInfo(src=addr, dst=addr, service=port, port_space=ce.RDMA_PS_TCP)
         # cmid
         self.event_channel = CMEventChannel()
         self.cid = CMID(creator=self.event_channel)
@@ -34,28 +35,45 @@ class Node:
         self.qp = None
         self.conn = None
 
-    def prepare_resource(self):
+    # if a server, here cmid is an event id; if a client, here cmid is it's cid
+    def prepare_resource(self, cmid):
         # pd, comp_channel, cq, qp
 
         # protection domains
-        self.pd = PD(self.cid.context)
-        # completion que
-        self.comp_channel = CompChannel(self.cid.context)
+        self.pd = PD(cmid.context)
+        # comp_channel cq
+        self.comp_channel = CompChannel(cmid.context)
         cqe = self.options.get("cq_init").get("cqe")
-        self.cq = CQ(self.cid.context, cqe, None, self.comp_channel, 0)
+        self.cq = CQ(cmid.context, cqe, None, self.comp_channel, 0)
         self.cq.req_notify()
+
         # build_qp_attr
         qp_options = self.options.get("qp_init")
         cap = QPCap(max_send_wr=qp_options.get("max_send_wr"), max_recv_wr=qp_options.get("max_recv_wr"),
                     max_send_sge=qp_options.get("max_send_sge"), max_recv_sge=qp_options.get("max_recv_sge"))
-        qp_init_attr = QPInitAttr(qp_type=qp_options.get("qp_type"), qp_context=self.cid.context, cap=cap, scq=self.cq, rcq=self.cq)
-        qp_attr = QPAttr(qp_state=e.IBV_QPT_RC)
-        self.qp = QP(self.pd, qp_init_attr, qp_attr)
-        # self.cid.create_qp(qp_init_attr)
-        # register_memory
+        qp_init_attr = QPInitAttr(qp_type=qp_options.get("qp_type"), qp_context=cmid.context,
+                                  cap=cap, scq=self.cq, rcq=self.cq)
+
+        # create_qp and bind in cmid
+        cmid.create_qp(qp_init_attr)
         self.conn = Connection(pd=self.pd)
-        # post_receives
-        sge = SGE(addr=id(self.conn.recv_region), length=c.BUFFER_SIZE, lkey=self.conn.recv_mr.lkey)
-        wr = RecvWR(num_sge=1, sg=[sge])
-        self.qp.post_recv(wr)
-        # self.cid.post_recv(self.conn.recv_mr)
+        cmid.post_recv(self.conn.recv_mr)
+
+        # create_qp alone
+        # qp_attr = QPAttr(qp_state=e.IBV_QPT_RC)
+        # QP
+        # self.qp = QP(self.pd, qp_init_attr, qp_attr)
+        # sge = SGE(addr=id(self.conn.recv_region), length=c.BUFFER_SIZE, lkey=self.conn.recv_mr.lkey)
+        # wr = RecvWR(num_sge=1, sg=[sge])
+        # self.qp.post_recv(wr)
+
+    def process_work_completion_events(self):
+        print(1)
+        self.comp_channel.get_cq_event(self.cq)
+        print(2)
+        self.cq.req_notify()
+        (npolled, wcs) = self.cq.poll()
+        print(npolled, wcs)
+        # for wc in wcs:
+        #     if wc.status !=
+
