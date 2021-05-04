@@ -40,7 +40,7 @@ class Node:
         # pd, comp_channel, cq, qp
 
         # protection domains
-        self.pd = PD(cmid.context)
+        self.pd = PD(cmid)
         # comp_channel cq
         self.comp_channel = CompChannel(cmid.context)
         cqe = self.options["cq_init"]["cqe"]
@@ -68,15 +68,13 @@ class Node:
         # self.qp.post_recv(wr)
 
     def process_work_completion_events(self):
-        print(1)
+        print("getting cq event")
         self.comp_channel.get_cq_event(self.cq)
-        print(2)
         self.cq.req_notify()
         (npolled, wcs) = self.cq.poll()
-        print(npolled, wcs)
+        print("poll has completed, npolled: ", npolled, "wcs: ", wcs)
         if npolled > 0:
             for wc in wcs:
                 if wc.status != e.IBV_WC_SUCCESS:
-                    print(wc)
+                    print("error:", wc)
             self.cq.ack_events(npolled)
-
