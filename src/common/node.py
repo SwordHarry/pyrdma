@@ -21,7 +21,7 @@ class Node:
             self.addr_info = AddrInfo(src=addr, service=port, port_space=ce.RDMA_PS_TCP, flags=ce.RAI_PASSIVE)
             print(ce.RDMA_PS_TCP, ce.RAI_PASSIVE)
         else:
-            self.addr_info = AddrInfo(src=addr, dst=addr, service=port, port_space=ce.RDMA_PS_TCP)
+            self.addr_info = AddrInfo(dst=addr, service=port, port_space=ce.RDMA_PS_TCP)
         # cmid
         self.event_channel = CMEventChannel()
         self.cid = CMID(creator=self.event_channel)
