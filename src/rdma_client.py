@@ -1,5 +1,7 @@
 # rdma client
 # const
+import sys
+
 import pyverbs.cm_enums as ce
 import pyverbs.enums as e
 # config
@@ -7,23 +9,10 @@ import src.config.config as c
 # common
 from src.common.common import die
 from src.common.node import Node
-from src.common.buffer_attr import BufferAttr
+from src.common.buffer_attr import BufferAttr, serialize, deserialize
 # pyverbs
 from pyverbs.cmid import CMEvent, ConnParam
 from pyverbs.mr import MR
-
-
-def _client_on_completion(wc):
-    if wc.status != e.IBV_WC_SUCCESS:
-        die("on_completion: status is not IBV_WC_SUCCESS")
-    if wc.opcode & e.IBV_WC_RECV:
-        conn = wc.wr_id
-        print(conn)
-        print("received message:", conn.recv_region)
-    elif wc.opcode == e.IBV_WC_SEND:
-        print("send completed successfully")
-    else:
-        die("on_completion: completion isn't a send or a receive")
 
 
 class RdmaClient(Node):
@@ -63,7 +52,7 @@ class RdmaClient(Node):
         self.cid.connect(conn_param)
         return False
 
-    # established, then exchange the data
+    # established, then exchange the meta data
     def _on_established(self) -> bool:
         # need to exchange meta data with server
         # resource_mr: read and write between server and client
@@ -71,14 +60,17 @@ class RdmaClient(Node):
                               e.IBV_ACCESS_LOCAL_WRITE | e.IBV_ACCESS_REMOTE_READ | e.IBV_ACCESS_REMOTE_WRITE)
         # metadata_send_mr: client send the resource_mr attr to server
         self.buffer_attr = BufferAttr(self.resource_mr.buf, c.BUFFER_SIZE, self.resource_mr.lkey)
-        buffer_attr_bytes = self.buffer_attr.serialize()
+        buffer_attr_bytes = serialize(self.buffer_attr)
         bytes_len = len(buffer_attr_bytes)
-        self.metadata_send_mr = MR(self.pd, bytes_len, e.IBV_ACCESS_LOCAL_WRITE)
-        # TODO: need to serialize buffer_attr
-        self.metadata_send_mr.write(buffer_attr_bytes, bytes_len)
+        # print("bytes_len", bytes_len) # 117
+        self.metadata_send_mr = MR(self.pd, c.BUFFER_SIZE, e.IBV_ACCESS_LOCAL_WRITE)
+        self.metadata_send_mr.write(buffer_attr_bytes, c.BUFFER_SIZE)
         self.cid.post_send(self.metadata_send_mr)
         print("client has post_send metadata")
         self.process_work_completion_events()
+        # get the server metadata attr
+        self.server_metadata_attr = deserialize(self.metadata_recv_mr.read(c.BUFFER_SIZE, 0))
+        print(self.server_metadata_attr)
         return False
 
     # error: rejected

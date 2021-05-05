@@ -1,11 +1,14 @@
 # rdma server
 # config
+from pyverbs.mr import MR
+
 import src.config.config as c
 import pyverbs.cm_enums as ce
 import pyverbs.enums as e
 # common
 from src.common.common import die
 from src.common.node import Node
+from src.common.buffer_attr import BufferAttr, deserialize, serialize
 # pyverbs
 from pyverbs.cmid import CMID, CMEvent, ConnParam
 
@@ -64,6 +67,22 @@ class RdmaServer(Node):
 
     def _on_established(self):
         # need to poll cq and ack
+        self.process_work_completion_events()
+        # get the client metadata attr
+        self.client_metadata_attr = deserialize(self.metadata_recv_mr.read(c.BUFFER_SIZE, 0))
+        print(self.client_metadata_attr)
+        # TODO: Duplicated code fragment (10 lines long)
+        self.resource_mr = MR(self.pd, c.BUFFER_SIZE,
+                              e.IBV_ACCESS_LOCAL_WRITE | e.IBV_ACCESS_REMOTE_READ | e.IBV_ACCESS_REMOTE_WRITE)
+        # metadata_send_mr: client send the resource_mr attr to server
+        self.buffer_attr = BufferAttr(self.resource_mr.buf, c.BUFFER_SIZE, self.resource_mr.lkey)
+        buffer_attr_bytes = serialize(self.buffer_attr)
+        bytes_len = len(buffer_attr_bytes)
+        # print("bytes_len", bytes_len) # 117
+        self.metadata_send_mr = MR(self.pd, c.BUFFER_SIZE, e.IBV_ACCESS_LOCAL_WRITE)
+        self.metadata_send_mr.write(buffer_attr_bytes, c.BUFFER_SIZE)
+        self.event_id.post_send(self.metadata_send_mr, e.IBV_SEND_SIGNALED)
+        print("server has post_send metadata")
         self.process_work_completion_events()
 
     def _on_rejected(self):
