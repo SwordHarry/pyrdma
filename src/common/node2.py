@@ -2,6 +2,7 @@
 import pyverbs.cm_enums as ce
 import pyverbs.enums as e
 # config
+from pyverbs.device import Context
 from pyverbs.wr import SGE, RecvWR, SendWR
 
 import src.config.config as c
@@ -30,7 +31,7 @@ def _check_wc_status(wc):
         die("on_completion: completion isn't a send or a receive")
 
 
-class Node:
+class RDMANode:
     def __init__(self, addr, port, name, is_server=False, options=c.OPTIONS):
         self.options = options
         self.is_server = is_server
@@ -38,9 +39,8 @@ class Node:
             self.addr_info = AddrInfo(src=addr, service=port, port_space=ce.RDMA_PS_TCP, flags=ce.RAI_PASSIVE)
         else:
             self.addr_info = AddrInfo(dst=addr, service=port, port_space=ce.RDMA_PS_TCP)
-        # cmid
+        self.ctx = Context(name)
         self.event_channel = CMEventChannel()
-        self.cid = CMID(creator=self.event_channel)
         self.pd = None
         self.comp_channel = None
         self.cq = None
@@ -56,20 +56,20 @@ class Node:
         self.metadata_send_mr = None
 
     # if a server, here cmid is an event id; if a client, here cmid is it's cid
-    def prepare_resource(self, cmid):
+    def prepare_resource(self):
         # protection domains
-        self.pd = PD(cmid)
+        self.pd = PD(self.ctx)
         # comp_channel cq
-        self.comp_channel = CompChannel(cmid.context)
+        self.comp_channel = CompChannel(self.ctx)
         cqe = self.options["cq_init"]["cqe"]
-        self.cq = CQ(cmid.context, cqe, None, self.comp_channel, 0)
+        self.cq = CQ(self.ctx, cqe, None, self.comp_channel, 0)
         self.cq.req_notify()
 
         # build_qp_attr
         qp_options = self.options["qp_init"]
         cap = QPCap(max_send_wr=qp_options["max_send_wr"], max_recv_wr=qp_options["max_recv_wr"],
                     max_send_sge=qp_options["max_send_sge"], max_recv_sge=qp_options["max_recv_sge"])
-        qp_init_attr = QPInitAttr(qp_type=qp_options["qp_type"], qp_context=cmid.context,
+        qp_init_attr = QPInitAttr(qp_type=qp_options["qp_type"], qp_context=self.ctx,
                                   cap=cap, scq=self.cq, rcq=self.cq)
         # create_qp and bind in cmid
         # cmid.create_qp(qp_init_attr)
