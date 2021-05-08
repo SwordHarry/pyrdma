@@ -9,7 +9,7 @@ from pyverbs.wr import SGE, SendWR
 
 import src.config.config as c
 # common
-from src.common.node import Node
+from src.common.rdma_node import Node
 from src.common.buffer_attr import BufferAttr, serialize, deserialize
 # pyverbs
 from pyverbs.cmid import CMEvent, ConnParam
@@ -63,9 +63,10 @@ class RdmaClient(Node):
         # bytes_len = len(buffer_attr_bytes)
         # print("bytes_len", bytes_len) # 117
         self.metadata_send_mr.write(buffer_attr_bytes, len(buffer_attr_bytes))
-        sge = SGE(addr=self.metadata_send_mr.buf, length=c.BUFFER_SIZE, lkey=self.metadata_send_mr.lkey)
-        wr = SendWR(num_sge=1, sg=[sge])
-        self.qp.post_send(wr)
+        # sge = SGE(addr=self.metadata_send_mr.buf, length=c.BUFFER_SIZE, lkey=self.metadata_send_mr.lkey)
+        # wr = SendWR(num_sge=1, sg=[sge])
+        # self.qp.post_send(wr)
+        self.cid.post_send(self.metadata_send_mr)
         print("client has post_send metadata")
         self.process_work_completion_events()
         # get the server metadata attr
@@ -76,9 +77,11 @@ class RdmaClient(Node):
         message = "a message from client"
         me_len = len(message)
         self.resource_mr.write(message, me_len)
-        sge = SGE(addr=self.resource_mr.buf, length=me_len, rkey=self.server_metadata_attr.remote_stag)
-        wr = SendWR(num_sge=1, sg=[sge], opcode=e.IBV_WR_RDMA_WRITE)
-        self.qp.post_send(wr)
+        # sge = SGE(addr=self.resource_mr.buf, length=me_len, rkey=self.server_metadata_attr.remote_stag)
+        # wr = SendWR(num_sge=1, sg=[sge], opcode=e.IBV_WR_RDMA_WRITE)
+        # wr.set_wr_rdma(rkey=self.server_metadata_attr.remote_stag, addr=self.server_metadata_attr.addr)
+        # self.qp.post_send(wr)
+        self.cid.post_send(self.resource_mr)
         self.process_work_completion_events()
         return False
 

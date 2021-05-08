@@ -10,7 +10,7 @@ import pyverbs.cm_enums as ce
 import pyverbs.enums as e
 # common
 from src.common.common import die
-from src.common.node import Node
+from src.common.rdma_node import Node
 from src.common.buffer_attr import BufferAttr, deserialize, serialize
 # pyverbs
 from pyverbs.cmid import CMID, CMEvent, ConnParam
@@ -76,9 +76,10 @@ class RdmaServer(Node):
         self.init_mr(client_metadata_attr.length)
         buffer_attr_bytes = serialize(self.buffer_attr)
         self.metadata_send_mr.write(buffer_attr_bytes, len(buffer_attr_bytes))
-        sge = SGE(addr=self.metadata_send_mr.buf, length=c.BUFFER_SIZE, lkey=self.metadata_send_mr.lkey)
-        wr = SendWR(num_sge=1, sg=[sge])
-        self.qp.post_send(wr)
+        # sge = SGE(addr=self.metadata_send_mr.buf, length=c.BUFFER_SIZE, lkey=self.metadata_send_mr.lkey)
+        # wr = SendWR(num_sge=1, sg=[sge])
+        # self.qp.post_send(wr)
+        self.event_id.post_send(self.metadata_send_mr)
         print("server has post_send metadata")
         self.process_work_completion_events()
 

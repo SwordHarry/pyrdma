@@ -17,4 +17,8 @@ OPTIONS = {
     "cq_init": {
         "cqe": 8
     },
+    "gid_init": {
+        "port_num": 1,
+        "gid_index": 1,
+    }
 }

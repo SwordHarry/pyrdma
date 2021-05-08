@@ -2,7 +2,6 @@
 import pyverbs.cm_enums as ce
 import pyverbs.enums as e
 # config
-from pyverbs.device import Context
 from pyverbs.wr import SGE, RecvWR, SendWR
 
 import src.config.config as c
@@ -31,7 +30,7 @@ def _check_wc_status(wc):
         die("on_completion: completion isn't a send or a receive")
 
 
-class RDMANode:
+class Node:
     def __init__(self, addr, port, name, is_server=False, options=c.OPTIONS):
         self.options = options
         self.is_server = is_server
@@ -39,8 +38,9 @@ class RDMANode:
             self.addr_info = AddrInfo(src=addr, service=port, port_space=ce.RDMA_PS_TCP, flags=ce.RAI_PASSIVE)
         else:
             self.addr_info = AddrInfo(dst=addr, service=port, port_space=ce.RDMA_PS_TCP)
-        self.ctx = Context(name)
+        # cmid
         self.event_channel = CMEventChannel()
+        self.cid = CMID(creator=self.event_channel)
         self.pd = None
         self.comp_channel = None
         self.cq = None
@@ -56,23 +56,23 @@ class RDMANode:
         self.metadata_send_mr = None
 
     # if a server, here cmid is an event id; if a client, here cmid is it's cid
-    def prepare_resource(self):
+    def prepare_resource(self, cmid):
         # protection domains
-        self.pd = PD(self.ctx)
+        self.pd = PD(cmid)
         # comp_channel cq
-        self.comp_channel = CompChannel(self.ctx)
+        self.comp_channel = CompChannel(cmid.context)
         cqe = self.options["cq_init"]["cqe"]
-        self.cq = CQ(self.ctx, cqe, None, self.comp_channel, 0)
+        self.cq = CQ(cmid.context, cqe, None, self.comp_channel, 0)
         self.cq.req_notify()
 
         # build_qp_attr
         qp_options = self.options["qp_init"]
         cap = QPCap(max_send_wr=qp_options["max_send_wr"], max_recv_wr=qp_options["max_recv_wr"],
                     max_send_sge=qp_options["max_send_sge"], max_recv_sge=qp_options["max_recv_sge"])
-        qp_init_attr = QPInitAttr(qp_type=qp_options["qp_type"], qp_context=self.ctx,
+        qp_init_attr = QPInitAttr(qp_type=qp_options["qp_type"], qp_context=cmid.context,
                                   cap=cap, scq=self.cq, rcq=self.cq)
         # create_qp and bind in cmid
-        # cmid.create_qp(qp_init_attr)
+        cmid.create_qp(qp_init_attr)
         # memory region
         # metadata_recv_mr: receive the metadata from other node
         # print("len: metadata_attr", len(self.metadata_attr)) # 112
@@ -81,10 +81,10 @@ class RDMANode:
         # create_qp alone
         # qp_attr = QPAttr(qp_state=e.IBV_QPT_RC)
         # QP
-        self.qp = QP(self.pd, qp_init_attr)
-        sge = SGE(addr=self.metadata_recv_mr.buf, length=c.BUFFER_SIZE, lkey=self.metadata_recv_mr.lkey)
-        wr = RecvWR(num_sge=1, sg=[sge])
-        self.qp.post_recv(wr)
+        # self.qp = QP(self.pd, qp_init_attr)
+        # sge = SGE(addr=self.metadata_recv_mr.buf, length=c.BUFFER_SIZE, lkey=self.metadata_recv_mr.lkey)
+        # wr = RecvWR(num_sge=1, sg=[sge])
+        # self.qp.post_recv(wr)
 
     def init_mr(self, buffer_size: int):
         # init metadata and resource mr
