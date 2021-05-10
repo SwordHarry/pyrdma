@@ -9,6 +9,7 @@ from pyverbs.wr import SGE, SendWR
 
 import src.config.config as c
 # common
+from src.common.common import print_info
 from src.common.rdma_node import Node
 from src.common.buffer_attr import BufferAttr, serialize, deserialize
 # pyverbs
@@ -41,7 +42,6 @@ class RdmaClient(Node):
 
     # resolved addr
     def _on_addr_resolved(self) -> bool:
-        print("address resolved.")
         # resolve_route: will bind context and pd
         self.cid.resolve_route(c.TIMEOUT_IN_MS)
         self.prepare_resource(self.cid)
@@ -49,7 +49,6 @@ class RdmaClient(Node):
 
     # resolve route
     def _on_route_resolved(self) -> bool:
-        print("route resolved.")
         conn_param = ConnParam(resources=3, depth=3, retry=3)
         self.cid.connect(conn_param)
         return False
@@ -67,22 +66,25 @@ class RdmaClient(Node):
         # wr = SendWR(num_sge=1, sg=[sge])
         # self.qp.post_send(wr)
         self.cid.post_send(self.metadata_send_mr)
-        print("client has post_send metadata")
         self.process_work_completion_events()
         # get the server metadata attr
         self.server_metadata_attr = deserialize(self.metadata_recv_mr.read(c.BUFFER_SIZE, 0))
-        print(self.server_metadata_attr)
+        print_info("server metadata attr:\n"+str(self.server_metadata_attr))
 
         # exchange done, write message to buffer
         message = "a message from client"
         me_len = len(message)
-        self.resource_mr.write(message, me_len)
-        # sge = SGE(addr=self.resource_mr.buf, length=me_len, rkey=self.server_metadata_attr.remote_stag)
-        # wr = SendWR(num_sge=1, sg=[sge], opcode=e.IBV_WR_RDMA_WRITE)
-        # wr.set_wr_rdma(rkey=self.server_metadata_attr.remote_stag, addr=self.server_metadata_attr.addr)
-        # self.qp.post_send(wr)
-        self.cid.post_send(self.resource_mr)
+        self.resource_send_mr.write(message, me_len)
+        self.cid.post_write(self.resource_send_mr, me_len,
+                            self.server_metadata_attr.addr, self.server_metadata_attr.remote_stag)
         self.process_work_completion_events()
+        resource_read_mr = MR(self.pd, c.BUFFER_SIZE,
+                              e.IBV_ACCESS_LOCAL_WRITE | e.IBV_ACCESS_REMOTE_READ | e.IBV_ACCESS_REMOTE_WRITE)
+        self.cid.post_read(resource_read_mr, c.BUFFER_SIZE,
+                           self.server_metadata_attr.addr, self.server_metadata_attr.remote_stag)
+        self.process_work_completion_events()
+        read_me = resource_read_mr.read(me_len, 0)
+        print_info("read from the server buffer:\n"+str(read_me))
         return False
 
     def _on_disconnected(self) -> bool:
@@ -92,8 +94,8 @@ class RdmaClient(Node):
 
     # error: rejected
     def _on_rejected(self) -> bool:
-        self.close()
         print("rejected?!")
+        self.close()
         return True
 
     def close(self):

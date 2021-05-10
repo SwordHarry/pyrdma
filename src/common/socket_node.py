@@ -44,17 +44,27 @@ class SocketNode:
         self.pd = PD(self.rdma_ctx)
         self.resource_mr = MR(self.pd, c.BUFFER_SIZE,
                               e.IBV_ACCESS_LOCAL_WRITE | e.IBV_ACCESS_REMOTE_READ | e.IBV_ACCESS_REMOTE_WRITE)
-
         # gid
         gid_options = self.options["gid_init"]
-        
         self.gid = self.rdma_ctx.query_gid(gid_options["port_num"], gid_options["gid_index"])
+        print(self.gid)
+        # cq
+        self.init_cq()
+        # qp
+        self.init_qp()
+        # send the metadata to other
+        self.buffer_attr = BufferAttr(str(self.gid), self.qp.qp_num, self.resource_mr.buf, c.BUFFER_SIZE,
+                                      self.resource_mr.lkey,
+                                      self.resource_mr.rkey)
 
+    def init_cq(self):
         # comp_channel cq
         self.comp_channel = CompChannel(self.rdma_ctx)
         cqe = self.options["cq_init"]["cqe"]
         self.cq = CQ(self.rdma_ctx, cqe, None, self.comp_channel, 0)
         self.cq.req_notify()
+
+    def init_qp(self):
         # qp
         qp_options = self.options["qp_init"]
         cap = QPCap(max_send_wr=qp_options["max_send_wr"], max_recv_wr=qp_options["max_recv_wr"],
@@ -64,16 +74,10 @@ class SocketNode:
         qp_attr = QPAttr()
         # qp_attr.ah_attr = ah_attr
         self.qp = QP(self.pd, qp_init_attr, qp_attr)
-        print(self.qp)
         # qp state
         self.qp.to_init(qp_attr)
-        # send the metadata to other
-        self.buffer_attr = BufferAttr(str(self.gid), self.qp.qp_num, self.resource_mr.buf, c.BUFFER_SIZE,
-                                      self.resource_mr.lkey,
-                                      self.resource_mr.rkey)
 
     def process_work_completion_events(self):
-        print("getting cq event")
         # self.comp_channel.get_cq_event(self.cq)
         # self.cq.req_notify()
         (npolled, wcs) = self.cq.poll()

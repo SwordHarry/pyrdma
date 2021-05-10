@@ -1,7 +1,8 @@
 import pyverbs.enums as e
 
 ADDR = "192.168.236.128"
-PORT = "20886"
+PORT_INT = 50008
+PORT_STR = "50008"
 NAME = "rxe_0"
 TIMEOUT_IN_MS = 500
 BUFFER_SIZE = 1024

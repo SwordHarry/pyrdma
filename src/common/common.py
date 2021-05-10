@@ -8,6 +8,12 @@ def die(reason):
     exit(1)
 
 
+def print_info(text=""):
+    print("====================================")
+    print(text)
+    print("====================================")
+
+
 class PollThread(threading.Thread):
     def __init__(self, context, thread_id=1, on_completion=None):
         threading.Thread.__init__(self)

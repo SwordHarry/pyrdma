@@ -23,9 +23,13 @@ def _check_wc_status(wc):
         print(wc)
         die("on_completion: status is not IBV_WC_SUCCESS")
     if wc.opcode & e.IBV_WC_RECV:
-        print("received message")
+        print("wc received message")
     elif wc.opcode == e.IBV_WC_SEND:
-        print("send completed successfully")
+        print("wc send completed successfully")
+    elif wc.opcode == e.IBV_WC_RDMA_WRITE:
+        print("wc rdma_write ok")
+    elif wc.opcode == e.IBV_WC_RDMA_READ:
+        print("wc rdma_read ok")
     else:
         die("on_completion: completion isn't a send or a receive")
 
@@ -35,9 +39,9 @@ class Node:
         self.options = options
         self.is_server = is_server
         if is_server:
-            self.addr_info = AddrInfo(src=addr, service=port, port_space=ce.RDMA_PS_TCP, flags=ce.RAI_PASSIVE)
+            self.addr_info = AddrInfo(src=addr, src_service=port, port_space=ce.RDMA_PS_TCP, flags=ce.RAI_PASSIVE)
         else:
-            self.addr_info = AddrInfo(dst=addr, service=port, port_space=ce.RDMA_PS_TCP)
+            self.addr_info = AddrInfo(dst=addr, dst_service=port, port_space=ce.RDMA_PS_TCP)
         # cmid
         self.event_channel = CMEventChannel()
         self.cid = CMID(creator=self.event_channel)
@@ -51,7 +55,7 @@ class Node:
         # mr
         self.metadata_recv_mr = None
         self.metadata_attr = BufferAttr()
-        self.resource_mr = None
+        self.resource_send_mr = None
         self.buffer_attr = None
         self.metadata_send_mr = None
 
@@ -77,7 +81,7 @@ class Node:
         # metadata_recv_mr: receive the metadata from other node
         # print("len: metadata_attr", len(self.metadata_attr)) # 112
         self.metadata_recv_mr = MR(self.pd, c.BUFFER_SIZE, e.IBV_ACCESS_LOCAL_WRITE)
-        # cmid.post_recv(self.metadata_recv_mr)
+        cmid.post_recv(self.metadata_recv_mr)
         # create_qp alone
         # qp_attr = QPAttr(qp_state=e.IBV_QPT_RC)
         # QP
@@ -88,21 +92,20 @@ class Node:
 
     def init_mr(self, buffer_size: int):
         # init metadata and resource mr
-        # resource_mr: read and write between server and client
-        self.resource_mr = MR(self.pd, buffer_size,
-                              e.IBV_ACCESS_LOCAL_WRITE | e.IBV_ACCESS_REMOTE_READ | e.IBV_ACCESS_REMOTE_WRITE)
-        # metadata_send_mr: client send the resource_mr attr to server
-        self.buffer_attr = BufferAttr(self.resource_mr.buf, buffer_size, self.resource_mr.lkey)
+        # resource_send_mr: read and write between server and client
+        self.resource_send_mr = MR(self.pd, buffer_size,
+                                   e.IBV_ACCESS_LOCAL_WRITE | e.IBV_ACCESS_REMOTE_READ | e.IBV_ACCESS_REMOTE_WRITE)
+        # metadata_send_mr: client send the resource_send_mr attr to server
+        self.buffer_attr = BufferAttr(addr=self.resource_send_mr.buf, length=buffer_size,
+                                      local_stag=self.resource_send_mr.lkey, remote_stag=self.resource_send_mr.rkey)
         # print("bytes_len", bytes_len) # 117
-        # metadata_send_mr: node send the resource_mr attr to others
+        # metadata_send_mr: node send the resource_send_mr attr to others
         self.metadata_send_mr = MR(self.pd, buffer_size, e.IBV_ACCESS_LOCAL_WRITE)
 
     def process_work_completion_events(self):
-        print("getting cq event")
         self.comp_channel.get_cq_event(self.cq)
         self.cq.req_notify()
         (npolled, wcs) = self.cq.poll()
-        print("poll has completed, npolled: ", npolled, "wcs: ", wcs)
         if npolled > 0:
             for wc in wcs:
                 _check_wc_status(wc)

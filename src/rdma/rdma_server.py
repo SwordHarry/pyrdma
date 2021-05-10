@@ -9,22 +9,11 @@ import src.config.config as c
 import pyverbs.cm_enums as ce
 import pyverbs.enums as e
 # common
-from src.common.common import die
+from src.common.common import die, print_info
 from src.common.rdma_node import Node
 from src.common.buffer_attr import BufferAttr, deserialize, serialize
 # pyverbs
 from pyverbs.cmid import CMID, CMEvent, ConnParam
-
-
-def _server_on_completion(wc):
-    if wc.status != e.IBV_WC_SUCCESS:
-        die("_server_on_completion: status is not IBV_WC_SUCCESS")
-    if wc.opcode & e.IBV_WC_RECV:
-        conn = wc.wr_id
-        print(conn)
-        print("received message:", conn.recv_region)
-    elif wc.opcode == e.IBV_WC_SEND:
-        print("send completed successfully")
 
 
 class RdmaServer(Node):
@@ -45,6 +34,7 @@ class RdmaServer(Node):
         # bind_addr: will bind context and pd
         self.cid.bind_addr(self.addr_info)
         self.cid.listen(backlog=10)
+        # self.cid.get_request()
         print("listening... ")
         while True:
             # block until the event come
@@ -60,19 +50,17 @@ class RdmaServer(Node):
             event.ack_cm_event()
 
     def _on_connect_request(self):
-        print("received connection request")
         self.prepare_resource(self.event_id)
         conn_param = ConnParam(resources=3, depth=3)
         # accept not use the origin server cmid, have to use the cmid in the events
         self.event_id.accept(conn_param)
-        print("server accept")
 
     def _on_established(self):
         # need to poll cq and ack
         self.process_work_completion_events()
         # get the client metadata attr
         client_metadata_attr = deserialize(self.metadata_recv_mr.read(c.BUFFER_SIZE, 0))
-        print(client_metadata_attr)
+        print_info("client metadata attr:\n"+str(client_metadata_attr))
         self.init_mr(client_metadata_attr.length)
         buffer_attr_bytes = serialize(self.buffer_attr)
         self.metadata_send_mr.write(buffer_attr_bytes, len(buffer_attr_bytes))
@@ -80,11 +68,11 @@ class RdmaServer(Node):
         # wr = SendWR(num_sge=1, sg=[sge])
         # self.qp.post_send(wr)
         self.event_id.post_send(self.metadata_send_mr)
-        print("server has post_send metadata")
         self.process_work_completion_events()
 
     def _on_disconnected(self):
         self.event_id.close()
+        self.event_id = None
 
     def _on_rejected(self):
         self.close()
