@@ -102,11 +102,14 @@ class Node:
         # metadata_send_mr: node send the resource_send_mr attr to others
         self.metadata_send_mr = MR(self.pd, buffer_size, e.IBV_ACCESS_LOCAL_WRITE)
 
-    def process_work_completion_events(self):
+    def process_work_completion_events(self, poll_count=1):
         self.comp_channel.get_cq_event(self.cq)
         self.cq.req_notify()
-        (npolled, wcs) = self.cq.poll()
-        if npolled > 0:
-            for wc in wcs:
-                _check_wc_status(wc)
-            self.cq.ack_events(npolled)
+        npolled = 0
+        while npolled < poll_count:
+            (one_poll_count, wcs) = self.cq.poll(num_entries=poll_count)
+            npolled += one_poll_count
+            if one_poll_count > 0:
+                for wc in wcs:
+                    _check_wc_status(wc)
+                self.cq.ack_events(one_poll_count)

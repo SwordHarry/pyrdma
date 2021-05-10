@@ -66,9 +66,10 @@ class RdmaClient(Node):
         # wr = SendWR(num_sge=1, sg=[sge])
         # self.qp.post_send(wr)
         self.cid.post_send(self.metadata_send_mr)
-        self.process_work_completion_events()
-        # get the server metadata attr
-        self.server_metadata_attr = deserialize(self.metadata_recv_mr.read(c.BUFFER_SIZE, 0))
+        self.process_work_completion_events(poll_count=2)
+        server_metadata_attr_bytes = self.metadata_recv_mr.read(c.BUFFER_SIZE, 0)
+        print(server_metadata_attr_bytes)
+        self.server_metadata_attr = deserialize(server_metadata_attr_bytes)
         print_info("server metadata attr:\n"+str(self.server_metadata_attr))
 
         # exchange done, write message to buffer
