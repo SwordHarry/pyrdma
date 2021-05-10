@@ -18,8 +18,8 @@ from pyverbs.mr import MR
 
 
 class RdmaClient(Node):
-    def __init__(self, addr, port, name, options=c.OPTIONS):
-        super().__init__(addr, port, name, options=options)
+    def __init__(self, addr, port, options=c.OPTIONS):
+        super().__init__(addr, port, options=options)
 
         # event loop map config
         self.event_map = {
@@ -68,7 +68,6 @@ class RdmaClient(Node):
         self.cid.post_send(self.metadata_send_mr)
         self.process_work_completion_events(poll_count=2)
         server_metadata_attr_bytes = self.metadata_recv_mr.read(c.BUFFER_SIZE, 0)
-        print(server_metadata_attr_bytes)
         self.server_metadata_attr = deserialize(server_metadata_attr_bytes)
         print_info("server metadata attr:\n"+str(self.server_metadata_attr))
 

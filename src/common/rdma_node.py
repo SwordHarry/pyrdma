@@ -35,7 +35,7 @@ def _check_wc_status(wc):
 
 
 class Node:
-    def __init__(self, addr, port, name, is_server=False, options=c.OPTIONS):
+    def __init__(self, addr, port, is_server=False, options=c.OPTIONS):
         self.options = options
         self.is_server = is_server
         if is_server:

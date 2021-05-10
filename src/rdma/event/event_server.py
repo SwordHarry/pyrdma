@@ -17,8 +17,8 @@ from pyverbs.cmid import CMID, CMEvent, ConnParam
 
 
 class RdmaServer(Node):
-    def __init__(self, addr, port, name, options=c.OPTIONS):
-        super().__init__(addr, port, name, is_server=True, options=options)
+    def __init__(self, addr, port, options=c.OPTIONS):
+        super().__init__(addr, port, is_server=True, options=options)
         print("ready to listen on ", addr + ":" + port)
 
         # event loop map config

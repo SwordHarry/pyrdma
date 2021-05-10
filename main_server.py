@@ -1,11 +1,12 @@
 # main
-from src.rdma.rdma_server import RdmaServer
-from src.socket_server import SocketServer
-from src.config.config import ADDR, PORT_STR, NAME, OPTIONS
+from src.rdma.socket.rdma_socket_server import RdmaSocketServer
+from src.config.config import ADDR, PORT_STR, OPTIONS
 
 if __name__ == "__main__":
-    s = RdmaServer(ADDR, PORT_STR, NAME, OPTIONS)
-    s.run()
-    s.close()
+    # s = RdmaServer(ADDR, PORT_STR, OPTIONS)
+    # s.run()
+    # s.close()
     # s = SocketServer()
     # s.serve()
+    s = RdmaSocketServer(ADDR, PORT_STR, OPTIONS)
+    s.serve()
