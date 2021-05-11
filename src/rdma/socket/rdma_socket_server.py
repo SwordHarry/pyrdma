@@ -1,4 +1,6 @@
 # const
+import pickle
+
 import pyverbs.cm_enums as ce
 import pyverbs.enums as e
 # config
@@ -76,8 +78,14 @@ class RdmaSocketServer:
 
                     new_id.post_send(metadata_send_mr)
                     process_wc_send_events(new_id)
-
+                    # wait for done
+                    process_wc_recv_events(new_id)
+                    done_message = pickle.loads(metadata_recv_mr.read(c.BUFFER_SIZE, 0))
+                    if done_message == "done":
+                        new_id.close()
+                        break
                 except Exception as err:
                     print("error:", err)
                     break
-            new_id.close()
+                finally:
+                    new_id.close()

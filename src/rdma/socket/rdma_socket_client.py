@@ -64,4 +64,24 @@ class RdmaSocketClient:
         server_metadata_attr_bytes = metadata_recv_mr.read(c.BUFFER_SIZE, 0)
         server_metadata_attr = deserialize(server_metadata_attr_bytes)
         print_info("server metadata attr:\n" + str(server_metadata_attr))
+        # exchange done, write message to buffer
+        message = "a message from client"
+        me_len = len(message)
+        resource_send_mr.write(message, me_len)
+        self.sid.post_write(resource_send_mr, me_len,
+                            server_metadata_attr.addr, server_metadata_attr.remote_stag)
+        process_wc_send_events(self.sid)
+        resource_read_mr = MR(pd, c.BUFFER_SIZE,
+                              e.IBV_ACCESS_LOCAL_WRITE | e.IBV_ACCESS_REMOTE_READ | e.IBV_ACCESS_REMOTE_WRITE)
+        self.sid.post_read(resource_read_mr, c.BUFFER_SIZE,
+                           server_metadata_attr.addr, server_metadata_attr.remote_stag)
+        process_wc_send_events(self.sid)
+        read_me = resource_read_mr.read(me_len, 0)
+        print_info("read from the server buffer:\n" + str(read_me))
+        # write and read done, notify the server done
+        message = "done"
+        # me_len = len(message)
+        resource_send_mr.write(message, c.BUFFER_SIZE)
+        self.sid.post_send(resource_send_mr)
+        process_wc_send_events(self.sid)
         self.sid.close()
