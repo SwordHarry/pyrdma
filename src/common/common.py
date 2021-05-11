@@ -1,5 +1,5 @@
 # request struct and config
-from pyverbs.cq import CQ
+import pyverbs.enums as e
 import threading
 
 
@@ -12,6 +12,22 @@ def print_info(text=""):
     print("====================================")
     print(text)
     print("====================================")
+
+
+def check_wc_status(wc):
+    if wc.status != e.IBV_WC_SUCCESS:
+        print(wc)
+        die("on_completion: status is not IBV_WC_SUCCESS")
+    if wc.opcode & e.IBV_WC_RECV:
+        print("wc received message")
+    elif wc.opcode == e.IBV_WC_SEND:
+        print("wc send completed successfully")
+    elif wc.opcode == e.IBV_WC_RDMA_WRITE:
+        print("wc rdma_write ok")
+    elif wc.opcode == e.IBV_WC_RDMA_READ:
+        print("wc rdma_read ok")
+    else:
+        die("on_completion: completion isn't a send or a receive")
 
 
 class PollThread(threading.Thread):

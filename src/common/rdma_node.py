@@ -6,7 +6,7 @@ from pyverbs.wr import SGE, RecvWR, SendWR
 
 import src.config.config as c
 # common
-from src.common.common import die
+from src.common.common import die, _check_wc_status
 from src.common.buffer_attr import BufferAttr, serialize
 # pyverbss
 from pyverbs.cmid import CMID, AddrInfo, CMEventChannel
@@ -17,21 +17,6 @@ from pyverbs.pd import PD
 
 
 # a common node for server or client
-
-def _check_wc_status(wc):
-    if wc.status != e.IBV_WC_SUCCESS:
-        print(wc)
-        die("on_completion: status is not IBV_WC_SUCCESS")
-    if wc.opcode & e.IBV_WC_RECV:
-        print("wc received message")
-    elif wc.opcode == e.IBV_WC_SEND:
-        print("wc send completed successfully")
-    elif wc.opcode == e.IBV_WC_RDMA_WRITE:
-        print("wc rdma_write ok")
-    elif wc.opcode == e.IBV_WC_RDMA_READ:
-        print("wc rdma_read ok")
-    else:
-        die("on_completion: completion isn't a send or a receive")
 
 
 class Node:
@@ -79,7 +64,6 @@ class Node:
         cmid.create_qp(qp_init_attr)
         # memory region
         # metadata_recv_mr: receive the metadata from other node
-        # print("len: metadata_attr", len(self.metadata_attr)) # 112
         self.metadata_recv_mr = MR(self.pd, c.BUFFER_SIZE, e.IBV_ACCESS_LOCAL_WRITE)
         cmid.post_recv(self.metadata_recv_mr)
         # create_qp alone
@@ -98,7 +82,6 @@ class Node:
         # metadata_send_mr: client send the resource_send_mr attr to server
         self.buffer_attr = BufferAttr(addr=self.resource_send_mr.buf, length=buffer_size,
                                       local_stag=self.resource_send_mr.lkey, remote_stag=self.resource_send_mr.rkey)
-        # print("bytes_len", bytes_len) # 117
         # metadata_send_mr: node send the resource_send_mr attr to others
         self.metadata_send_mr = MR(self.pd, buffer_size, e.IBV_ACCESS_LOCAL_WRITE)
 
