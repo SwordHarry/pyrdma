@@ -31,7 +31,7 @@ class SocketServer:
                     # use socket to exchange the metadata of server
                     client_metadata_attr_bytes = conn.recv(c.BUFFER_SIZE)
                     client_metadata_attr = deserialize(client_metadata_attr_bytes)
-                    print_info("the client metadata attr is:\n"+str(client_metadata_attr))
+                    print_info("the client metadata attr is:\n" + str(client_metadata_attr))
                     node = SocketNode(self.name)
                     node.prepare_resource()
                     # qp
@@ -46,13 +46,16 @@ class SocketServer:
                     # send its buffer attr to client
                     buffer_attr_bytes = serialize(node.buffer_attr)
                     conn.sendall(buffer_attr_bytes)
-                    sge = SGE(addr=node.resource_mr.buf, length=client_metadata_attr.length, lkey=node.resource_mr.lkey)
-                    wr = RecvWR(num_sge=1, sg=[sge, ])
-                    node.qp.post_recv(wr)
+                    # exchange metadata done
+                    # sge = SGE(addr=node.resource_mr.buf, length=client_metadata_attr.length, lkey=node.resource_mr.lkey)
+                    # wr = RecvWR(num_sge=1, sg=[sge, ])
+                    # node.qp.post_recv(wr)
                     # -------------------------------
-                    node.process_work_completion_events()
-                    read_message = node.resource_mr.read(c.BUFFER_SIZE, 0)
-                    print_info("read from resource_mr: "+str(read_message))
+                    done_msg = conn.recv(c.BUFFER_SIZE)
+                    if str(done_msg) == "done":
+                        break
+                    # read_message = node.resource_mr.read(c.BUFFER_SIZE, 0)
+                    # print_info("read from resource_mr: "+str(read_message))
                     # self.qp.to_rtr(QPAttr(cur_qp_state=self.qp.qp_state))
                     print("---------------------------- A CONNECT DONE  --------------------------------")
                 except Exception as err:

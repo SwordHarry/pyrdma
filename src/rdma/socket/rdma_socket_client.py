@@ -11,30 +11,8 @@ from pyverbs.cmid import CMID, AddrInfo
 from pyverbs.mr import MR
 from pyverbs.pd import PD
 from pyverbs.qp import QPInitAttr, QPCap
-
-
-def process_wc_send_events(cmid, poll_count=1):
-    npolled = 0
-    wcs = []
-    while npolled < poll_count:
-        wc = cmid.get_send_comp()
-        if wc is not None:
-            npolled += 1
-            wcs.append(wc)
-    for wc in wcs:
-        check_wc_status(wc)
-
-
-def process_wc_recv_events(cmid, poll_count=1):
-    npolled = 0
-    wcs = []
-    while npolled < poll_count:
-        wc = cmid.get_recv_comp()
-        if wc is not None:
-            npolled += 1
-            wcs.append(wc)
-    for wc in wcs:
-        check_wc_status(wc)
+# util
+from src.rdma.socket.rdma_socket_util import process_wc_send_events, process_wc_recv_events
 
 
 class RdmaSocketClient:

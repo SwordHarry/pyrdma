@@ -34,7 +34,7 @@ class SocketClient:
         # get the metadata from server
         server_metadata_attr_bytes = self.socket.recv(c.BUFFER_SIZE)
         server_metadata_attr = deserialize(server_metadata_attr_bytes)
-        print_info("server metadata attr:\n"+str(server_metadata_attr))
+        print_info("server metadata attr:\n" + str(server_metadata_attr))
         # qp
         qp_attr = QPAttr(qp_state=e.IBV_QPS_RTS, cur_qp_state=node.qp.qp_state)
         gid_options = self.options["gid_init"]
@@ -47,20 +47,13 @@ class SocketClient:
         # exchange done, write message to buffer
         message = "a message from client"
         me_len = len(message)
-        node.resource_mr.write(message, me_len)
-        sge = SGE(addr=node.resource_mr.buf, length=me_len, lkey=node.resource_mr.lkey)
-        wr = SendWR(num_sge=1, sg=[sge, ], opcode=e.IBV_WR_RDMA_WRITE)
-        wr.set_wr_rdma(rkey=server_metadata_attr.remote_stag, addr=server_metadata_attr.addr)
-        node.qp.post_send(wr)
+        node.post_write(message, me_len, server_metadata_attr.remote_stag, server_metadata_attr.addr)
         node.process_work_completion_events()
         # read the message
-        self.read_mr = MR(node.pd, c.BUFFER_SIZE,
-                          e.IBV_ACCESS_LOCAL_WRITE | e.IBV_ACCESS_REMOTE_READ | e.IBV_ACCESS_REMOTE_WRITE)
-        sge = SGE(addr=self.read_mr.buf, length=me_len, lkey=self.read_mr.lkey)
-        wr = SendWR(num_sge=1, sg=[sge, ], opcode=e.IBV_WC_RDMA_READ)
-        wr.set_wr_rdma(rkey=server_metadata_attr.remote_stag, addr=server_metadata_attr.addr)
-        node.qp.post_send(wr)
-        read_message = self.read_mr.read(me_len, 0)
-        print_info("read from sever\n"+str(read_message))
+        node.post_read(me_len, server_metadata_attr.remote_stag, server_metadata_attr.addr)
         node.process_work_completion_events()
+        read_message = node.read_mr.read(me_len, 0)
+        print_info("read from sever\n" + str(read_message))
+        message = b"done"
+        self.socket.sendall(message)
         self.socket.close()  # 关闭连接

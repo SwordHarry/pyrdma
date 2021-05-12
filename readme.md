@@ -5,7 +5,12 @@ and [python3-pyverbs](https://github.com/linux-rdma/rdma-core/tree/master/pyverb
 ### environment
 - Ubuntu_v20.04
 - Roce
-- rdma-core debian_v32.0.1
+- rdma-core debian_v32.0.1 or debian_v28.0.1
+
+### implement
+- src.rdma.event: cmid and event poll(need v32)
+- src.rdma.socket: cmid and socket(need v32)
+- src.socket: socket and ibv
 
 ### server
 ```shell
