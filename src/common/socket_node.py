@@ -65,7 +65,7 @@ class SocketNode:
         # comp_channel cq
         self.comp_channel = CompChannel(self.rdma_ctx)
         cqe = self.options["cq_init"]["cqe"]
-        self.cq = CQ(self.rdma_ctx, cqe, None, self.comp_channel, 0)
+        self.cq = CQ(self.rdma_ctx, cqe, None, None, 0)
         self.cq.req_notify()
 
     def init_qp(self):
@@ -82,8 +82,8 @@ class SocketNode:
         self.qp.to_init(qp_attr)
 
     def process_work_completion_events(self, poll_count=1):
-        self.comp_channel.get_cq_event(self.cq)
-        self.cq.req_notify()
+        # self.comp_channel.get_cq_event(self.cq)
+        # self.cq.req_notify()
         npolled = 0
         while npolled < poll_count:
             (one_poll_count, wcs) = self.cq.poll(num_entries=poll_count)

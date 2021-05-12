@@ -54,6 +54,7 @@ class SocketClient:
         node.process_work_completion_events()
         read_message = node.read_mr.read(me_len, 0)
         print_info("read from sever\n" + str(read_message))
+        # done
         message = b"done"
         self.socket.sendall(message)
         self.socket.close()  # 关闭连接

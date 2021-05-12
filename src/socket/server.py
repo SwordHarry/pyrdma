@@ -50,7 +50,6 @@ class SocketServer:
                     # sge = SGE(addr=node.resource_mr.buf, length=client_metadata_attr.length, lkey=node.resource_mr.lkey)
                     # wr = RecvWR(num_sge=1, sg=[sge, ])
                     # node.qp.post_recv(wr)
-                    # -------------------------------
                     done_msg = conn.recv(c.BUFFER_SIZE)
                     if str(done_msg) == "done":
                         break
