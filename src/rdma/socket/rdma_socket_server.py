@@ -5,14 +5,14 @@ import pyverbs.cm_enums as ce
 import pyverbs.enums as e
 # config
 import src.config.config as c
-# pyverbs
+# common
+from src.common.buffer_attr import BufferAttr, deserialize, serialize
+from src.common.common import check_wc_status, print_info
+# pyverbs: need v32
 from pyverbs.cmid import CMID, AddrInfo
 from pyverbs.mr import MR
 from pyverbs.pd import PD
 from pyverbs.qp import QPInitAttr, QPCap
-
-from src.common.buffer_attr import BufferAttr, deserialize, serialize
-from src.common.common import die, check_wc_status, print_info
 
 
 def process_wc_send_events(cmid, poll_count=1):
@@ -41,7 +41,9 @@ def process_wc_recv_events(cmid, poll_count=1):
 
 class RdmaSocketServer:
     def __init__(self, addr, port, options=c.OPTIONS):
-        addr_info = AddrInfo(src=addr, src_service=port, port_space=ce.RDMA_PS_TCP, flags=ce.RAI_PASSIVE)
+        # addr_info = AddrInfo(src=addr, src_service=port, port_space=ce.RDMA_PS_TCP, flags=ce.RAI_PASSIVE)# v32
+        print(addr, port)
+        addr_info = AddrInfo(src=addr, service=port, port_space=ce.RDMA_PS_TCP, flags=ce.RAI_PASSIVE)
         qp_options = options["qp_init"]
         cap = QPCap(max_send_wr=qp_options["max_send_wr"], max_recv_wr=qp_options["max_recv_wr"],
                     max_send_sge=qp_options["max_send_sge"], max_recv_sge=qp_options["max_recv_sge"])
