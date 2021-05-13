@@ -24,6 +24,10 @@ def _check_wc_status(wc):
         print("received message")
     elif wc.opcode == e.IBV_WC_SEND:
         print("send completed successfully")
+    elif wc.opcode == e.IBV_WC_RDMA_WRITE:
+        print("write complete")
+    elif wc.opcode == e.IBV_WC_RDMA_READ:
+        print("read complete")
     else:
         die("on_completion: completion isn't a send or a receive")
 
@@ -68,22 +72,6 @@ class SocketNode:
         self.cq = CQ(self.rdma_ctx, cqe, None, self.comp_channel, 0)
         self.cq.req_notify()
 
-    def modify_qp(self, metadata_attr, qp_state=e.IBV_QPS_INIT, cur_qp_state=e.IBV_QPS_RESET):
-        gid_options = self.options["gid_init"]
-        qp_attr = QPAttr(qp_state=qp_state, cur_qp_state=cur_qp_state)
-        port_num = gid_options["port_num"]
-        remote_gid = GID(metadata_attr.gid)
-        gr = GlobalRoute(dgid=remote_gid, sgid_index=gid_options["gid_index"])
-        ah_attr = AHAttr(gr=gr, is_global=1, port_num=port_num)
-        qp_attr.ah_attr = ah_attr
-        qp_attr.dest_qp_num = metadata_attr.qp_num
-        if qp_state == e.IBV_QPS_INIT:
-            self.qp.to_init(qp_attr)
-        elif qp_state == e.IBV_QPS_RTR:
-            self.qp.to_rtr(qp_attr)
-        else:
-            self.qp.to_rts(qp_attr)
-
     def init_qp(self):
         qp_options = self.options["qp_init"]
         cap = QPCap(max_send_wr=qp_options["max_send_wr"], max_recv_wr=qp_options["max_recv_wr"],
@@ -92,9 +80,34 @@ class SocketNode:
                                   cap=cap, scq=self.cq, rcq=self.cq)
         self.qp = QP(self.pd, qp_init_attr)
 
+    def qp2init(self):
+        qp_attr = QPAttr(qp_state=e.IBV_QPS_INIT, cur_qp_state=e.IBV_QPS_RESET)
+        qp_attr.qp_access_flags = e.IBV_ACCESS_LOCAL_WRITE | e.IBV_ACCESS_REMOTE_READ | e.IBV_ACCESS_REMOTE_WRITE
+        self.qp.to_init(qp_attr)
+        return self
+
+    def qp2rtr(self, metadata_attr):
+        gid_options = self.options["gid_init"]
+        qp_attr = QPAttr(qp_state=e.IBV_QPS_RTR, cur_qp_state=e.IBV_QPS_INIT)
+        qp_attr.qp_access_flags = e.IBV_ACCESS_LOCAL_WRITE | e.IBV_ACCESS_REMOTE_READ | e.IBV_ACCESS_REMOTE_WRITE
+        port_num = gid_options["port_num"]
+        remote_gid = GID(metadata_attr.gid)
+        gr = GlobalRoute(dgid=remote_gid, sgid_index=gid_options["gid_index"])
+        ah_attr = AHAttr(gr=gr, is_global=1, port_num=port_num)
+        qp_attr.ah_attr = ah_attr
+        qp_attr.dest_qp_num = metadata_attr.qp_num
+        self.qp.to_rtr(qp_attr)
+        return self
+
+    def qp2rts(self):
+        qp_attr = QPAttr(qp_state=e.IBV_QPS_RTS, cur_qp_state=e.IBV_QPS_RTR)
+        qp_attr.qp_access_flags = e.IBV_ACCESS_LOCAL_WRITE | e.IBV_ACCESS_REMOTE_READ | e.IBV_ACCESS_REMOTE_WRITE
+        self.qp.to_rts(qp_attr)
+        return self
+
     def process_work_completion_events(self, poll_count=1):
-        # self.comp_channel.get_cq_event(self.cq)
-        # self.cq.req_notify()
+        self.comp_channel.get_cq_event(self.cq)
+        self.cq.req_notify()
         npolled = 0
         while npolled < poll_count:
             (one_poll_count, wcs) = self.cq.poll(num_entries=poll_count)
@@ -112,7 +125,7 @@ class SocketNode:
         self.qp.post_send(wr)
 
     def post_read(self, length, rkey, remote_addr):
-        sge = SGE(addr=self.resource_mr.buf, length=length, lkey=self.resource_mr.lkey)
+        sge = SGE(addr=self.read_mr.buf, length=length, lkey=self.read_mr.lkey)
         wr = SendWR(num_sge=1, sg=[sge, ], opcode=e.IBV_WR_RDMA_READ)
         wr.set_wr_rdma(rkey=rkey, addr=remote_addr)
         self.qp.post_send(wr)

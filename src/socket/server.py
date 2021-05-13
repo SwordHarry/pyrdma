@@ -34,9 +34,8 @@ class SocketServer:
                     print_info("the client metadata attr is:\n" + str(client_metadata_attr))
                     node = SocketNode(self.name)
                     node.prepare_resource()
-                    node.modify_qp(client_metadata_attr)
-                    # qp
-                    node.modify_qp(client_metadata_attr, e.IBV_QPS_RTS, node.qp.qp_state)
+                    # qp_attr
+                    node.qp2init().qp2rtr(client_metadata_attr)
                     # send its buffer attr to client
                     buffer_attr_bytes = serialize(node.buffer_attr)
                     conn.sendall(buffer_attr_bytes)

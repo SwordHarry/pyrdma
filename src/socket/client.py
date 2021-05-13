@@ -36,8 +36,7 @@ class SocketClient:
         server_metadata_attr = deserialize(server_metadata_attr_bytes)
         print_info("server metadata attr:\n" + str(server_metadata_attr))
         # qp
-        node.modify_qp(server_metadata_attr)
-        node.modify_qp(server_metadata_attr, e.IBV_QPS_RTS, node.qp.qp_state)
+        node.qp2init().qp2rtr(server_metadata_attr).qp2rts()
         # exchange done, write message to buffer
         message = "a message from client"
         me_len = len(message)
@@ -45,6 +44,7 @@ class SocketClient:
         node.process_work_completion_events()
         # read the message
         node.post_read(me_len, server_metadata_attr.remote_stag, server_metadata_attr.addr)
+        print("read")
         node.process_work_completion_events()
         read_message = node.read_mr.read(me_len, 0)
         print_info("read from sever\n" + str(read_message))
