@@ -3,7 +3,7 @@ import pyverbs.enums as e
 # config
 from pyverbs.cq import CompChannel, CQ
 from pyverbs.qp import QPCap, QPInitAttr, QPAttr, QP
-from pyverbs.addr import GID
+from pyverbs.addr import GID, GlobalRoute, AHAttr
 from pyverbs.wr import SGE, SendWR
 
 import src.config.config as c
@@ -65,21 +65,32 @@ class SocketNode:
         # comp_channel cq
         self.comp_channel = CompChannel(self.rdma_ctx)
         cqe = self.options["cq_init"]["cqe"]
-        self.cq = CQ(self.rdma_ctx, cqe, None, None, 0)
+        self.cq = CQ(self.rdma_ctx, cqe, None, self.comp_channel, 0)
         self.cq.req_notify()
 
+    def modify_qp(self, metadata_attr, qp_state=e.IBV_QPS_INIT, cur_qp_state=e.IBV_QPS_RESET):
+        gid_options = self.options["gid_init"]
+        qp_attr = QPAttr(qp_state=qp_state, cur_qp_state=cur_qp_state)
+        port_num = gid_options["port_num"]
+        remote_gid = GID(metadata_attr.gid)
+        gr = GlobalRoute(dgid=remote_gid, sgid_index=gid_options["gid_index"])
+        ah_attr = AHAttr(gr=gr, is_global=1, port_num=port_num)
+        qp_attr.ah_attr = ah_attr
+        qp_attr.dest_qp_num = metadata_attr.qp_num
+        if qp_state == e.IBV_QPS_INIT:
+            self.qp.to_init(qp_attr)
+        elif qp_state == e.IBV_QPS_RTR:
+            self.qp.to_rtr(qp_attr)
+        else:
+            self.qp.to_rts(qp_attr)
+
     def init_qp(self):
-        # qp
         qp_options = self.options["qp_init"]
         cap = QPCap(max_send_wr=qp_options["max_send_wr"], max_recv_wr=qp_options["max_recv_wr"],
                     max_send_sge=qp_options["max_send_sge"], max_recv_sge=qp_options["max_recv_sge"])
         qp_init_attr = QPInitAttr(qp_type=qp_options["qp_type"], qp_context=self.rdma_ctx,
                                   cap=cap, scq=self.cq, rcq=self.cq)
-        qp_attr = QPAttr()
-        # qp_attr.ah_attr = ah_attr
-        self.qp = QP(self.pd, qp_init_attr, qp_attr)
-        # qp state
-        self.qp.to_init(qp_attr)
+        self.qp = QP(self.pd, qp_init_attr)
 
     def process_work_completion_events(self, poll_count=1):
         # self.comp_channel.get_cq_event(self.cq)

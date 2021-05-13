@@ -36,14 +36,8 @@ class SocketClient:
         server_metadata_attr = deserialize(server_metadata_attr_bytes)
         print_info("server metadata attr:\n" + str(server_metadata_attr))
         # qp
-        qp_attr = QPAttr(qp_state=e.IBV_QPS_RTS, cur_qp_state=node.qp.qp_state)
-        gid_options = self.options["gid_init"]
-        s_gid = GID(server_metadata_attr.gid)
-        gr = GlobalRoute(dgid=s_gid, sgid_index=gid_options["gid_index"])
-        ah_attr = AHAttr(gr=gr, is_global=1, port_num=gid_options["port_num"])
-        qp_attr.ah_attr = ah_attr
-        qp_attr.dest_qp_num = server_metadata_attr.qp_num
-        node.qp.to_rts(qp_attr)
+        node.modify_qp(server_metadata_attr)
+        node.modify_qp(server_metadata_attr, e.IBV_QPS_RTS, node.qp.qp_state)
         # exchange done, write message to buffer
         message = "a message from client"
         me_len = len(message)

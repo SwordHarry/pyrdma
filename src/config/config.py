@@ -20,6 +20,6 @@ OPTIONS = {
     },
     "gid_init": {
         "port_num": 1,
-        "gid_index": 1,
+        "gid_index": 1,  # 3 mean to use the RoCE v2 interface
     }
 }

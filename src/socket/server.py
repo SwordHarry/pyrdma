@@ -34,15 +34,9 @@ class SocketServer:
                     print_info("the client metadata attr is:\n" + str(client_metadata_attr))
                     node = SocketNode(self.name)
                     node.prepare_resource()
+                    node.modify_qp(client_metadata_attr)
                     # qp
-                    qp_attr = QPAttr(qp_state=e.IBV_QPS_RTS, cur_qp_state=node.qp.qp_state)
-                    gid_options = self.options["gid_init"]
-                    c_gid = GID(client_metadata_attr.gid)
-                    gr = GlobalRoute(dgid=c_gid, sgid_index=gid_options["gid_index"])
-                    ah_attr = AHAttr(gr=gr, is_global=1, port_num=gid_options["port_num"])
-                    qp_attr.ah_attr = ah_attr
-                    qp_attr.dest_qp_num = client_metadata_attr.qp_num
-                    node.qp.to_rtr(qp_attr)
+                    node.modify_qp(client_metadata_attr, e.IBV_QPS_RTS, node.qp.qp_state)
                     # send its buffer attr to client
                     buffer_attr_bytes = serialize(node.buffer_attr)
                     conn.sendall(buffer_attr_bytes)
