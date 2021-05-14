@@ -2,6 +2,8 @@
 import pyverbs.enums as e
 import threading
 
+DONE_MSG = "DONE"
+
 
 def die(reason):
     print(reason)
@@ -9,9 +11,9 @@ def die(reason):
 
 
 def print_info(text=""):
-    print("====================================")
+    print("===============================================================")
     print(text)
-    print("====================================")
+    print("===============================================================")
 
 
 def check_wc_status(wc):

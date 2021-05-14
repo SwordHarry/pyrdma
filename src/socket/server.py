@@ -1,13 +1,8 @@
 import socket
-
-# const
-import pyverbs.enums as e
-from pyverbs.addr import AHAttr, GlobalRoute, GID
-from src.common.common import print_info
-from pyverbs.cmid import CMEventChannel, CMEvent
-from pyverbs.qp import QPAttr
-from pyverbs.wr import SGE, RecvWR, SendWR
+# config
 import src.config.config as c
+# common
+from src.common.common import print_info, DONE_MSG
 from src.common.buffer_attr import deserialize, serialize
 from src.common.socket_node import SocketNode
 
@@ -40,15 +35,10 @@ class SocketServer:
                     buffer_attr_bytes = serialize(node.buffer_attr)
                     conn.sendall(buffer_attr_bytes)
                     # exchange metadata done
-                    # sge = SGE(addr=node.resource_mr.buf, length=client_metadata_attr.length, lkey=node.resource_mr.lkey)
-                    # wr = RecvWR(num_sge=1, sg=[sge, ])
-                    # node.qp.post_recv(wr)
                     done_msg = conn.recv(c.BUFFER_SIZE)
-                    if str(done_msg) == "done":
+                    if str(done_msg) == DONE_MSG:
                         break
-                    # read_message = node.resource_mr.read(c.BUFFER_SIZE, 0)
-                    # print_info("read from resource_mr: "+str(read_message))
-                    # self.qp.to_rtr(QPAttr(cur_qp_state=self.qp.qp_state))
+
                     print("---------------------------- A CONNECT DONE  --------------------------------")
                 except Exception as err:
                     print("error", err)

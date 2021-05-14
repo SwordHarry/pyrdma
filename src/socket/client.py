@@ -1,18 +1,10 @@
 import socket
-# const
-import pyverbs.enums as e
-import pyverbs.cmid
 # config
 import src.config.config as c
 # common
-from src.common.common import print_info
+from src.common.common import print_info, DONE_MSG
 from src.common.socket_node import SocketNode
 from src.common.buffer_attr import serialize, deserialize
-# pyverbs
-from pyverbs.addr import AHAttr, GlobalRoute, GID
-from pyverbs.mr import MR
-from pyverbs.qp import QPAttr
-from pyverbs.wr import SGE, SendWR
 
 
 class SocketClient:
@@ -46,9 +38,8 @@ class SocketClient:
         node.post_read(me_len, server_metadata_attr.remote_stag, server_metadata_attr.addr)
         print("read")
         node.process_work_completion_events()
-        read_message = node.read_mr.read(me_len, 0)
+        read_message = node.resource_mr.read(me_len, 0)
         print_info("read from sever\n" + str(read_message))
         # done
-        message = b"done"
-        self.socket.sendall(message)
+        self.socket.sendall(DONE_MSG)
         self.socket.close()  # 关闭连接

@@ -75,11 +75,13 @@ class RdmaClient(Node):
         message = "a message from client"
         me_len = len(message)
         self.resource_send_mr.write(message, me_len)
+        # cmid.post_write: need debian_v32
         self.cid.post_write(self.resource_send_mr, me_len,
                             self.server_metadata_attr.addr, self.server_metadata_attr.remote_stag)
         self.process_work_completion_events()
         resource_read_mr = MR(self.pd, c.BUFFER_SIZE,
                               e.IBV_ACCESS_LOCAL_WRITE | e.IBV_ACCESS_REMOTE_READ | e.IBV_ACCESS_REMOTE_WRITE)
+        # cmid.post_read: need debian_v32
         self.cid.post_read(resource_read_mr, c.BUFFER_SIZE,
                            self.server_metadata_attr.addr, self.server_metadata_attr.remote_stag)
         self.process_work_completion_events()
