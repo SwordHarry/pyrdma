@@ -38,7 +38,7 @@ class SocketClient:
         node.post_read(me_len, server_metadata_attr.remote_stag, server_metadata_attr.addr)
         print("read")
         node.process_work_completion_events()
-        read_message = node.resource_mr.read(me_len, 0)
+        read_message = node.read_mr.read(me_len, 0)
         print_info("read from sever\n" + str(read_message))
         # done
         self.socket.sendall(DONE_MSG)

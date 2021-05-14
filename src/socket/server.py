@@ -36,7 +36,7 @@ class SocketServer:
                     conn.sendall(buffer_attr_bytes)
                     # exchange metadata done
                     done_msg = conn.recv(c.BUFFER_SIZE)
-                    if str(done_msg) == DONE_MSG:
+                    if done_msg == DONE_MSG:
                         break
 
                     print("---------------------------- A CONNECT DONE  --------------------------------")

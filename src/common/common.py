@@ -2,7 +2,7 @@
 import pyverbs.enums as e
 import threading
 
-DONE_MSG = "DONE"
+DONE_MSG = b"DONE"
 
 
 def die(reason):

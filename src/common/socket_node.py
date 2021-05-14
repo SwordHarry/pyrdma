@@ -51,6 +51,8 @@ class SocketNode:
         self.pd = PD(self.rdma_ctx)
         self.resource_mr = MR(self.pd, c.BUFFER_SIZE,
                               e.IBV_ACCESS_LOCAL_WRITE | e.IBV_ACCESS_REMOTE_READ | e.IBV_ACCESS_REMOTE_WRITE)
+        self.read_mr = MR(self.pd, c.BUFFER_SIZE,
+                          e.IBV_ACCESS_LOCAL_WRITE | e.IBV_ACCESS_REMOTE_READ | e.IBV_ACCESS_REMOTE_WRITE)
         # gid
         gid_options = self.options["gid_init"]
         self.gid = self.rdma_ctx.query_gid(gid_options["port_num"], gid_options["gid_index"])
@@ -123,7 +125,7 @@ class SocketNode:
         self.qp.post_send(wr)
 
     def post_read(self, length, rkey, remote_addr):
-        sge = SGE(addr=self.resource_mr.buf, length=length, lkey=self.resource_mr.lkey)
+        sge = SGE(addr=self.read_mr.buf, length=length, lkey=self.read_mr.lkey)
         wr = SendWR(num_sge=1, sg=[sge, ], opcode=e.IBV_WR_RDMA_READ)
         wr.set_wr_rdma(rkey=rkey, addr=remote_addr)
         self.qp.post_send(wr)
