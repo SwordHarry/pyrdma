@@ -2,7 +2,7 @@ import socket
 # config
 import src.config.config as c
 # common
-from src.common.common import print_info, DONE_MSG
+from src.common.common import print_info, DONE_MSG, WRITE_DONE
 from src.common.buffer_attr import deserialize, serialize
 from src.common.socket_node import SocketNode
 
@@ -37,6 +37,7 @@ class SocketServer:
                     # exchange metadata done
                     done_msg = conn.recv(c.BUFFER_SIZE)
                     if done_msg == DONE_MSG:
+                        node.close()
                         break
 
                     print("---------------------------- A CONNECT DONE  --------------------------------")

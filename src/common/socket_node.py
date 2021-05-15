@@ -120,12 +120,22 @@ class SocketNode:
     def post_write(self, data, length, rkey, remote_addr):
         self.resource_mr.write(data, length)
         sge = SGE(addr=self.resource_mr.buf, length=length, lkey=self.resource_mr.lkey)
-        wr = SendWR(num_sge=1, sg=[sge, ], opcode=e.IBV_WR_RDMA_WRITE)
+        wr = SendWR(opcode=e.IBV_WR_RDMA_WRITE, num_sge=1, sg=[sge, ])
         wr.set_wr_rdma(rkey=rkey, addr=remote_addr)
         self.qp.post_send(wr)
 
+    # TODO: bug: post read can not poll cq?
     def post_read(self, length, rkey, remote_addr):
         sge = SGE(addr=self.read_mr.buf, length=length, lkey=self.read_mr.lkey)
-        wr = SendWR(num_sge=1, sg=[sge, ], opcode=e.IBV_WR_RDMA_READ)
+        wr = SendWR(opcode=e.IBV_WR_RDMA_READ, num_sge=1, sg=[sge, ])
         wr.set_wr_rdma(rkey=rkey, addr=remote_addr)
         self.qp.post_send(wr)
+
+    def close(self):
+        self.rdma_ctx.close()
+        self.pd.close()
+        self.resource_mr.close()
+        self.read_mr.close()
+        self.comp_channel.close()
+        self.cq.close()
+        self.qp.close()

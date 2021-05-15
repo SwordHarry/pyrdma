@@ -2,7 +2,12 @@
 import pyverbs.enums as e
 import threading
 
+# DONE MSG LIST
 DONE_MSG = b"DONE"
+WRITE_DONE = b"WRITE_DONE"
+READ_DONE = b"READ_DONE"
+
+MAX_POLL_CQ_TIMEOUT = 5000
 
 
 def die(reason):
