@@ -55,7 +55,7 @@ class SocketNode:
                           e.IBV_ACCESS_LOCAL_WRITE | e.IBV_ACCESS_REMOTE_READ | e.IBV_ACCESS_REMOTE_WRITE)
         # gid
         gid_options = self.options["gid_init"]
-        self.gid = self.rdma_ctx.query_gid(gid_options["port_num"], gid_options["gid_index"])
+        gid = self.rdma_ctx.query_gid(gid_options["port_num"], gid_options["gid_index"])
         # cq
         self.init_cq()
         # qp
@@ -63,7 +63,7 @@ class SocketNode:
         # send the metadata to other
         self.buffer_attr = BufferAttr(self.resource_mr.buf, c.BUFFER_SIZE,
                                       self.resource_mr.lkey, self.resource_mr.rkey,
-                                      str(self.gid), self.qp.qp_num)
+                                      str(gid), self.qp.qp_num)
 
     def init_cq(self):
         # comp_channel cq

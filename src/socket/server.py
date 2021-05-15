@@ -2,7 +2,7 @@ import socket
 # config
 import src.config.config as c
 # common
-from src.common.common import print_info, DONE_MSG, WRITE_DONE
+from src.common.common import print_info, DONE_MSG
 from src.common.buffer_attr import deserialize, serialize
 from src.common.socket_node import SocketNode
 

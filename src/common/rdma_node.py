@@ -6,7 +6,7 @@ from pyverbs.wr import SGE, RecvWR, SendWR
 
 import src.config.config as c
 # common
-from src.common.common import die, _check_wc_status
+from src.common.common import die, check_wc_status
 from src.common.buffer_attr import BufferAttr, serialize
 # pyverbss
 from pyverbs.cmid import CMID, AddrInfo, CMEventChannel
@@ -94,5 +94,5 @@ class Node:
             npolled += one_poll_count
             if one_poll_count > 0:
                 for wc in wcs:
-                    _check_wc_status(wc)
+                    check_wc_status(wc)
                 self.cq.ack_events(one_poll_count)
