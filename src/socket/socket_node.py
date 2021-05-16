@@ -4,11 +4,12 @@ import pyverbs.enums as e
 from pyverbs.cq import CompChannel, CQ
 from pyverbs.qp import QPCap, QPInitAttr, QPAttr, QP
 from pyverbs.addr import GID, GlobalRoute, AHAttr
-from pyverbs.wr import SGE, SendWR
+from pyverbs.wr import SGE, SendWR, RecvWR
 
 import src.config.config as c
+import src.common.msg as m
 # common
-from src.common.buffer_attr import BufferAttr
+from src.common.buffer_attr import BufferAttr, FileAttr, serialize
 from src.common.common import die
 # pyverbs
 from pyverbs.device import Context
@@ -16,7 +17,7 @@ from pyverbs.mr import MR
 from pyverbs.pd import PD
 
 
-def _check_wc_status(wc):
+def check_wc_status(wc):
     if wc.status != e.IBV_WC_SUCCESS:
         print(wc)
         die("on_completion: status is not IBV_WC_SUCCESS")
@@ -40,6 +41,8 @@ class SocketNode:
         self.pd = None
         self.resource_mr = None
         self.read_mr = None
+        self.recv_mr = None
+        self.file_mr = None
         self.gid = None
         self.buffer_attr = None
         self.comp_channel = None
@@ -52,6 +55,10 @@ class SocketNode:
         self.resource_mr = MR(self.pd, c.BUFFER_SIZE,
                               e.IBV_ACCESS_LOCAL_WRITE | e.IBV_ACCESS_REMOTE_READ | e.IBV_ACCESS_REMOTE_WRITE)
         self.read_mr = MR(self.pd, c.BUFFER_SIZE,
+                          e.IBV_ACCESS_LOCAL_WRITE | e.IBV_ACCESS_REMOTE_READ | e.IBV_ACCESS_REMOTE_WRITE)
+        self.recv_mr = MR(self.pd, c.BUFFER_SIZE,
+                          e.IBV_ACCESS_LOCAL_WRITE | e.IBV_ACCESS_REMOTE_READ | e.IBV_ACCESS_REMOTE_WRITE)
+        self.file_mr = MR(self.pd, c.FILE_SIZE,
                           e.IBV_ACCESS_LOCAL_WRITE | e.IBV_ACCESS_REMOTE_READ | e.IBV_ACCESS_REMOTE_WRITE)
         # gid
         gid_options = self.options["gid_init"]
@@ -105,6 +112,7 @@ class SocketNode:
         self.qp.to_rts(qp_attr)
         return self
 
+    # poll cq
     def process_work_completion_events(self, poll_count=1):
         self.comp_channel.get_cq_event(self.cq)
         self.cq.req_notify()
@@ -114,13 +122,13 @@ class SocketNode:
             npolled += one_poll_count
             if one_poll_count > 0:
                 for wc in wcs:
-                    _check_wc_status(wc)
+                    check_wc_status(wc)
                 self.cq.ack_events(one_poll_count)
 
-    def post_write(self, data, length, rkey, remote_addr):
+    def post_write(self, data, length, rkey, remote_addr, opcode=e.IBV_WR_RDMA_WRITE):
         self.resource_mr.write(data, length)
         sge = SGE(addr=self.resource_mr.buf, length=length, lkey=self.resource_mr.lkey)
-        wr = SendWR(opcode=e.IBV_WR_RDMA_WRITE, num_sge=1, sg=[sge, ])
+        wr = SendWR(opcode=opcode, num_sge=1, sg=[sge, ])
         wr.set_wr_rdma(rkey=rkey, addr=remote_addr)
         self.qp.post_send(wr)
 
@@ -130,6 +138,27 @@ class SocketNode:
         wr = SendWR(opcode=e.IBV_WR_RDMA_READ, num_sge=1, sg=[sge, ])
         wr.set_wr_rdma(rkey=rkey, addr=remote_addr)
         self.qp.post_send(wr)
+
+    def post_recv(self):
+        sge = SGE(addr=self.recv_mr.buf, length=c.BUFFER_SIZE, lkey=self.recv_mr.lkey)
+        wr = RecvWR(num_sge=1, sg=[sge, ])
+        self.qp.post_recv(wr)
+
+    def push_file(self, conn, file_path, rkey, remote_addr):
+        fd = open(file_path, "rb")
+        file_attr = FileAttr(file_path, len(file_path))
+        # write file name
+        conn.sendall(serialize(file_attr))
+        msg = conn.recv(c.BUFFER_SIZE)
+        while msg != m.DONE_MSG:
+            pass
+
+        # file body
+        fd = open(file_path, "rb")
+        pass
+
+    def pull_file(self, file_path):
+        pass
 
     def close(self):
         self.rdma_ctx.close()

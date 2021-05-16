@@ -2,9 +2,10 @@ import socket
 # config
 import src.config.config as c
 # common
-from src.common.common import print_info, DONE_MSG
+from src.common.common import print_info
+import src.common.msg as m
 from src.common.buffer_attr import deserialize, serialize
-from src.common.socket_node import SocketNode
+from src.socket.socket_node import SocketNode
 
 
 # connection establish use socket, then use ibv to rdma
@@ -20,28 +21,38 @@ class SocketServer:
     def serve(self):
         while True:
             conn, addr = self.server.accept()
+            node = SocketNode(self.name)
+            node.prepare_resource()
+            print("\n---------------------------- A CONNECT ACCEPT  --------------------------------")
+            # event loop
             while True:
                 try:
-                    print("\n---------------------------- A CONNECT ACCEPT  --------------------------------")
-                    # use socket to exchange the metadata of server
-                    client_metadata_attr_bytes = conn.recv(c.BUFFER_SIZE)
-                    client_metadata_attr = deserialize(client_metadata_attr_bytes)
-                    print_info("the client metadata attr is:\n" + str(client_metadata_attr))
-                    node = SocketNode(self.name)
-                    node.prepare_resource()
-                    # qp_attr
-                    node.qp2init().qp2rtr(client_metadata_attr)
-                    # send its buffer attr to client
-                    buffer_attr_bytes = serialize(node.buffer_attr)
-                    conn.sendall(buffer_attr_bytes)
-                    # exchange metadata done
-                    done_msg = conn.recv(c.BUFFER_SIZE)
-                    if done_msg == DONE_MSG:
+                    msg = conn.recv(c.BUFFER_SIZE)
+                    if msg == m.BEGIN_MSG:
+                        print("begin, exchange the metadata")
+                        conn.sendall(m.READY_MSG)
+                        # exchange the metadata
+                        # use socket to exchange the metadata of server
+                        client_metadata_attr_bytes = conn.recv(c.BUFFER_SIZE)
+                        client_metadata_attr = deserialize(client_metadata_attr_bytes)
+                        print_info("the client metadata attr is:\n" + str(client_metadata_attr))
+                        # qp_attr
+                        node.qp2init().qp2rtr(client_metadata_attr)
+                        node.post_recv()
+                        # send its buffer attr to client
+                        buffer_attr_bytes = serialize(node.buffer_attr)
+                        conn.sendall(buffer_attr_bytes)
+                        # exchange metadata done
+                        node.process_work_completion_events()
+                    elif msg == m.PUSH_FILE_MSG:
+                        pass
+                    elif msg == m.DONE_MSG:
+                        print("done")
                         node.close()
                         break
 
-                    print("---------------------------- A CONNECT DONE  --------------------------------")
                 except Exception as err:
                     print("error", err)
                     break
+            print("---------------------------- A CONNECT DONE  --------------------------------")
             conn.close()

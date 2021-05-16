@@ -1,17 +1,15 @@
 # rdma client
 # const
-import sys
 
 import pyverbs.cm_enums as ce
 import pyverbs.enums as e
 # config
-from pyverbs.wr import SGE, SendWR
 
 import src.config.config as c
 # common
 from src.common.common import print_info
-from src.common.rdma_node import Node
-from src.common.buffer_attr import BufferAttr, serialize, deserialize
+from src.rdma.event.rdma_node import Node
+from src.common.buffer_attr import serialize, deserialize
 # pyverbs
 from pyverbs.cmid import CMEvent, ConnParam
 from pyverbs.mr import MR
