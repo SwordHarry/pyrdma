@@ -37,7 +37,7 @@ class SocketServer:
                         client_metadata_attr = deserialize(client_metadata_attr_bytes)
                         print_info("the client metadata attr is:\n" + str(client_metadata_attr))
                         # qp_attr
-                        node.qp2init().qp2rtr(client_metadata_attr)
+                        node.qp2init().qp2rtr(client_metadata_attr).qp2rts()
                         node.post_recv()
                         # send its buffer attr to client
                         buffer_attr_bytes = serialize(node.buffer_attr)
@@ -45,7 +45,8 @@ class SocketServer:
                         # exchange metadata done
                         node.process_work_completion_events()
                     elif msg == m.PUSH_FILE_MSG:
-                        pass
+                        node.save_file()
+
                     elif msg == m.DONE_MSG:
                         print("done")
                         node.close()
