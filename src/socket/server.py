@@ -43,7 +43,7 @@ class SocketServer:
                         buffer_attr_bytes = serialize(node.buffer_attr)
                         conn.sendall(buffer_attr_bytes)
                         # exchange metadata done
-                        node.process_work_completion_events()
+                        # node.process_work_completion_events()
                     elif msg == m.PUSH_FILE_MSG:
                         node.save_file()
                         print("success save file")
