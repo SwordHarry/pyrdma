@@ -181,7 +181,8 @@ class SocketNode:
     def save_file(self):
         self.post_recv(self.file_mr)
         self.post_send(self.msg_mr, m.FILE_BEGIN_MSG)
-        self.process_work_completion_events()
+        while not self.file_done:
+            self.poll_file()
 
     # poll cq for file service
     def poll_file(self, poll_count=1):
@@ -204,6 +205,7 @@ class SocketNode:
                 size = wc.imm_data
                 if size == 0:
                     self.post_send(self.msg_mr, m.FILE_DONE_MSG)
+                    self.file_done = True
                 elif self.file_name:
                     file_stream = self.file_mr.read(size, 0)
                     self.fd.write(file_stream)

@@ -36,13 +36,14 @@ class SocketClient:
             print_info("server metadata attr:\n" + str(server_metadata_attr))
             # qp
             node.qp2init().qp2rtr(server_metadata_attr).qp2rts()
-            # exchange done, write message to buffer
+            # exchange done, write message or push file to buffer
+
             message = "a message from client"
             me_len = len(message)
-            node.post_write(message, me_len, server_metadata_attr.remote_stag, server_metadata_attr.addr)
+            node.post_write(node.file_mr, message, me_len, server_metadata_attr.remote_stag, server_metadata_attr.addr)
             node.process_work_completion_events()
             # read the message
-            node.post_read(me_len, server_metadata_attr.remote_stag, server_metadata_attr.addr)
+            node.post_read(node.read_mr, me_len, server_metadata_attr.remote_stag, server_metadata_attr.addr)
             print("read")
             node.process_work_completion_events()
             read_message = node.read_mr.read(me_len, 0)
