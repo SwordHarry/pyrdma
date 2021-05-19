@@ -232,7 +232,8 @@ class SocketNode:
                     self.post_recv(self.file_mr)
                     file_name = self.file_mr.read(size, 0).decode("UTF-8", "ignore")
                     self.file_name = file_name
-                    self.fd = open("./des/" + file_name, "wb+")
+                    print(file_name)
+                    self.fd = open("./test/des/50M.file", "wb+")
                     self.post_send(self.msg_mr, m.FILE_READY_MSG)
                 pass
             elif wc.opcode & e.IBV_WC_RECV:

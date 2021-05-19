@@ -39,7 +39,7 @@ class SocketClient:
             # exchange done, write message or push file to buffer
             node.post_recv(node.recv_mr)
             self.socket.sendall(m.PUSH_FILE_MSG)
-            node.push_file("./50M.file", server_metadata_attr.remote_stag, server_metadata_attr.addr)
+            node.push_file("./test/src/50M.file", server_metadata_attr.remote_stag, server_metadata_attr.addr)
             # message = "a message from client"
             # me_len = len(message)
             # node.post_write(node.file_mr, message, me_len, server_metadata_attr.remote_stag, server_metadata_attr.addr)
