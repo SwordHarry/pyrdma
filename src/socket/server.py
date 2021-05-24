@@ -1,5 +1,6 @@
 import socket
 # config
+
 import src.config.config as c
 # common
 from src.common.common import print_info
@@ -22,7 +23,6 @@ class SocketServer:
         while True:
             conn, addr = self.server.accept()
             node = SocketNode(self.name)
-            node.prepare_resource()
             print("\n---------------------------- A CONNECT ACCEPT  --------------------------------")
             # event loop
             while True:
@@ -37,13 +37,13 @@ class SocketServer:
                         client_metadata_attr = deserialize(client_metadata_attr_bytes)
                         print_info("the client metadata attr is:\n" + str(client_metadata_attr))
                         # qp_attr
-                        node.qp2init().qp2rtr(client_metadata_attr).qp2rts()
-                        node.post_recv(node.recv_mr)
+                        node.qp2init().qp2rtr(client_metadata_attr)
+                        # node.post_recv(node.recv_mr)
                         # send its buffer attr to client
                         buffer_attr_bytes = serialize(node.buffer_attr)
                         conn.sendall(buffer_attr_bytes)
                         # exchange metadata done
-                        # node.process_work_completion_events()
+                        node.process_work_completion_events()
                     elif msg == m.PUSH_FILE_MSG:
                         node.save_file()
                         print("success save file")
