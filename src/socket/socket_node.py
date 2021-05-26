@@ -2,7 +2,7 @@
 import pyverbs.cq
 import pyverbs.enums as e
 # config
-from pyverbs.cq import CompChannel, CQ
+from pyverbs.cq import CQ
 from pyverbs.qp import QPCap, QPInitAttr, QPAttr, QP
 from pyverbs.addr import GID, GlobalRoute, AHAttr
 from pyverbs.wr import SGE, SendWR, RecvWR
@@ -10,7 +10,7 @@ from pyverbs.wr import SGE, SendWR, RecvWR
 import src.config.config as c
 import src.common.msg as m
 # common
-from src.common.buffer_attr import BufferAttr, FileAttr, serialize
+from src.common.buffer_attr import BufferAttr
 from src.common.common import die
 # pyverbs
 from pyverbs.device import Context
@@ -117,7 +117,7 @@ class SocketNode:
         return self
 
     # poll cq
-    def process_work_completion_events(self, poll_count=1):
+    def poll_cq(self, poll_count=1, callback=check_wc_status):
         self.cq.req_notify()
         npolled = 0
         while npolled < poll_count:
@@ -126,10 +126,10 @@ class SocketNode:
                 npolled += one_poll_count
                 self.cq.ack_events(one_poll_count)
                 for wc in wcs:
-                    check_wc_status(wc)
+                    callback(wc)
 
     def post_write(self, mr: MR, data, length, rkey, remote_addr, opcode=e.IBV_WR_RDMA_WRITE, imm_data=0):
-        mr.write(data, length)  # TODO: bug for signal 11
+        mr.write(data, length)
         sge = SGE(addr=mr.buf, length=length, lkey=mr.lkey)
         wr = SendWR(opcode=opcode, num_sge=1, sg=[sge, ])
         wr.set_wr_rdma(rkey=rkey, addr=remote_addr)
@@ -159,8 +159,8 @@ class SocketNode:
 
     # passive push file
     def push_file(self, file_path, rkey, remote_addr):
-        # self.post_recv(self.recv_mr)
-        self.process_work_completion_events()
+        self.post_recv(self.recv_mr)
+        self.poll_cq()
         msg = self.recv_mr.read(c.BUFFER_SIZE, 0)
         if check_msg(msg, m.FILE_BEGIN_MSG):
             # file body
@@ -171,7 +171,7 @@ class SocketNode:
                             rkey, remote_addr, opcode=e.IBV_WR_RDMA_WRITE_WITH_IMM, imm_data=len(file_path))
             self.post_recv(self.recv_mr)
             while not self.file_done:
-                self.poll_file()
+                self.poll_cq(callback=self.cb_wc)
             self.fd.close()
             self.file_name = ""
 
@@ -183,22 +183,10 @@ class SocketNode:
         self.post_recv(self.file_mr)
         self.post_send(self.msg_mr, m.FILE_BEGIN_MSG)
         while not self.file_done:
-            self.poll_file()
+            self.poll_cq(callback=self.cb_wc)
         self.fd.close()
         self.file_name = ""
         self.post_send(self.msg_mr, m.FILE_DONE_MSG)
-
-    # poll cq for file service
-    def poll_file(self, poll_count=1):
-        self.cq.req_notify()
-        npolled = 0
-        while npolled < poll_count:
-            (one_poll_count, wcs) = self.cq.poll(num_entries=poll_count)
-            if one_poll_count > 0:
-                npolled += one_poll_count
-                self.cq.ack_events(one_poll_count)
-                for wc in wcs:
-                    self.cb_wc(wc)
 
     def cb_wc(self, wc: pyverbs.cq.WC):
         if wc.status == e.IBV_WC_SUCCESS:

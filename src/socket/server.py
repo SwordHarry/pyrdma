@@ -26,7 +26,7 @@ class SocketServer:
             print("\n---------------------------- A CONNECT ACCEPT  --------------------------------")
             # event loop
             while True:
-                try:
+                # try:
                     msg = conn.recv(c.BUFFER_SIZE)
                     if msg == m.BEGIN_MSG:
                         print("begin, exchange the metadata")
@@ -37,13 +37,13 @@ class SocketServer:
                         client_metadata_attr = deserialize(client_metadata_attr_bytes)
                         print_info("the client metadata attr is:\n" + str(client_metadata_attr))
                         # qp_attr
-                        node.qp2init().qp2rtr(client_metadata_attr)
+                        node.qp2init().qp2rtr(client_metadata_attr).qp2rts()
                         # node.post_recv(node.recv_mr)
                         # send its buffer attr to client
                         buffer_attr_bytes = serialize(node.buffer_attr)
                         conn.sendall(buffer_attr_bytes)
                         # exchange metadata done
-                        node.process_work_completion_events()
+                        # node.poll_cq()
                     elif msg == m.PUSH_FILE_MSG:
                         node.save_file()
                         print("success save file")
@@ -52,8 +52,8 @@ class SocketServer:
                         node.close()
                         break
 
-                except Exception as err:
-                    print("error", err)
-                    break
+                # except Exception as err:
+                #     print("error", err)
+                #     break
             print("---------------------------- A CONNECT DONE  --------------------------------")
             conn.close()

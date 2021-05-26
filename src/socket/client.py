@@ -37,16 +37,16 @@ class SocketClient:
             node.qp2init().qp2rtr(server_metadata_attr).qp2rts()
             # exchange done, write message or push file to buffer
             # node.post_recv(node.recv_mr)
-            # self.socket.sendall(m.PUSH_FILE_MSG)
-            # node.push_file("./test/src/test.txt", server_metadata_attr.remote_stag, server_metadata_attr.addr)
-            # print("push done exist")
-            msg = "a message from client"
-            node.post_write(node.file_mr, msg, len(msg), server_metadata_attr.remote_stag, server_metadata_attr.addr)
-            node.process_work_completion_events()
-            node.post_read(node.recv_mr, c.BUFFER_SIZE, server_metadata_attr.remote_stag, server_metadata_attr.addr)
-            node.process_work_completion_events()
-            msg = node.recv_mr.read(c.BUFFER_SIZE, 0)
-            print(msg)
+            self.socket.sendall(m.PUSH_FILE_MSG)
+            node.push_file("./test/src/50M.file", server_metadata_attr.remote_stag, server_metadata_attr.addr)
+            print("push done exist")
+            # msg = "a message from client"
+            # node.post_write(node.file_mr, msg, len(msg), server_metadata_attr.remote_stag, server_metadata_attr.addr)
+            # node.poll_cq()
+            # node.post_read(node.recv_mr, c.BUFFER_SIZE, server_metadata_attr.remote_stag, server_metadata_attr.addr)
+            # node.poll_cq()
+            # msg = node.recv_mr.read(c.BUFFER_SIZE, 0)
+            # print(msg)
         # done
         self.socket.sendall(m.DONE_MSG)
         node.close()
