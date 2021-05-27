@@ -34,9 +34,9 @@ class RdmaSocketServer:
         while True:
             new_id = self.sid.get_request()
             new_id.accept()
+            print("\n---------------------------- A CONNECT ACCEPT  --------------------------------")
             while True:
                 try:
-                    print("a connect come")
                     pd = PD(new_id)
                     metadata_recv_mr = MR(pd, c.BUFFER_SIZE, e.IBV_ACCESS_LOCAL_WRITE)
                     new_id.post_recv(metadata_recv_mr)
@@ -59,13 +59,17 @@ class RdmaSocketServer:
                     new_id.post_send(metadata_send_mr)
                     process_wc_send_events(new_id)
                     # wait for done
+                    new_id.post_recv(metadata_recv_mr)
                     process_wc_recv_events(new_id)
-                    done_message = pickle.loads(metadata_recv_mr.read(c.BUFFER_SIZE, 0))
+                    done_message = metadata_recv_mr.read(c.BUFFER_SIZE, 0)
                     if done_message == "done":
                         new_id.close()
+                        print("---------------------------- A CONNECT DONE  --------------------------------")
                         break
                 except Exception as err:
                     print("error:", err)
                     break
                 finally:
                     new_id.close()
+                    print("---------------------------- A CONNECT DONE  --------------------------------")
+                    break

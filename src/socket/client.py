@@ -7,8 +7,6 @@ import src.common.msg as m
 from src.socket.socket_node import SocketNode
 from src.common.buffer_attr import serialize, deserialize
 
-import asyncio
-
 
 class SocketClient:
     def __init__(self, name=c.NAME, addr=c.ADDR, port=c.PORT_INT, options=c.OPTIONS):
@@ -43,9 +41,9 @@ class SocketClient:
             # msg = "a message from client"
             # node.post_write(node.file_mr, msg, len(msg), server_metadata_attr.remote_stag, server_metadata_attr.addr)
             # node.poll_cq()
-            # node.post_read(node.recv_mr, c.BUFFER_SIZE, server_metadata_attr.remote_stag, server_metadata_attr.addr)
+            # node.post_read(node.read_mr, c.BUFFER_SIZE, server_metadata_attr.remote_stag, server_metadata_attr.addr)
             # node.poll_cq()
-            # msg = node.recv_mr.read(c.BUFFER_SIZE, 0)
+            # msg = node.read_mr.read(c.BUFFER_SIZE, 0)
             # print(msg)
         # done
         self.socket.sendall(m.DONE_MSG)
