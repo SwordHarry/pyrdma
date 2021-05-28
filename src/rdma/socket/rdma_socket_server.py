@@ -7,7 +7,7 @@ import pyverbs.enums as e
 import src.config.config as c
 # common
 from src.common.buffer_attr import BufferAttr, deserialize, serialize
-from src.common.common import check_wc_status, print_info
+from src.common.utils import check_wc_status, print_info
 # pyverbs: need v32
 from pyverbs.cmid import CMID, AddrInfo
 from pyverbs.mr import MR

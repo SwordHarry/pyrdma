@@ -6,7 +6,7 @@ from pyverbs.wr import SGE, RecvWR, SendWR
 
 import src.config.config as c
 # common
-from src.common.common import die, check_wc_status
+from src.common.utils import die, check_wc_status
 from src.common.buffer_attr import BufferAttr, serialize
 # pyverbss
 from pyverbs.cmid import CMID, AddrInfo, CMEventChannel

@@ -1,4 +1,4 @@
-from src.common.common import check_wc_status
+from src.common.utils import check_wc_status
 
 
 def process_wc_send_events(cmid, poll_count=1):

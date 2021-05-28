@@ -4,7 +4,7 @@
 import src.config.config as c
 import pyverbs.cm_enums as ce
 # common
-from src.common.common import print_info
+from src.common.utils import print_info
 from src.rdma.event.rdma_node import Node
 from src.common.buffer_attr import deserialize, serialize
 # pyverbs

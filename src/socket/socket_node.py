@@ -1,4 +1,6 @@
 # const
+import os
+
 import pyverbs.cq
 import pyverbs.enums as e
 # config
@@ -11,7 +13,7 @@ import src.config.config as c
 import src.common.msg as m
 # common
 from src.common.buffer_attr import BufferAttr
-from src.common.common import die
+import src.common.utils as utils
 # pyverbs
 from pyverbs.device import Context
 from pyverbs.mr import MR
@@ -21,7 +23,7 @@ from pyverbs.pd import PD
 def check_wc_status(wc):
     if wc.status != e.IBV_WC_SUCCESS:
         print(wc)
-        die("on_completion: status is not IBV_WC_SUCCESS")
+        utils.die("on_completion: status is not IBV_WC_SUCCESS")
     if wc.opcode & e.IBV_WC_RECV:
         print("received message")
     elif wc.opcode == e.IBV_WC_SEND:
@@ -31,7 +33,7 @@ def check_wc_status(wc):
     elif wc.opcode == e.IBV_WC_RDMA_READ:
         print("read complete")
     else:
-        die("completion isn't a send, write, read or a receive")
+        utils.die("completion isn't a send, write, read or a receive")
 
 
 def check_msg(msg, msg2):
@@ -157,8 +159,8 @@ class SocketNode:
         wr = RecvWR(num_sge=1, sg=[sge, ])
         self.qp.post_recv(wr)
 
-    # passive push file
-    def push_file(self, file_path, rkey, remote_addr):
+    # initiative push file
+    def c_push_file(self, file_path):
         self.post_recv(self.recv_mr)
         self.poll_cq()
         msg = self.recv_mr.read(c.BUFFER_SIZE, 0)
@@ -168,25 +170,64 @@ class SocketNode:
             self.fd = open(file_path, "rb")
             # write file name
             self.post_write(self.file_mr, file_path, len(file_path),
-                            rkey, remote_addr, opcode=e.IBV_WR_RDMA_WRITE_WITH_IMM, imm_data=len(file_path))
+                            self.remote_metadata.remote_stag, self.remote_metadata.addr,
+                            opcode=e.IBV_WR_RDMA_WRITE_WITH_IMM, imm_data=len(file_path))
             self.post_recv(self.recv_mr)
             while not self.file_done:
                 self.poll_cq(callback=self.cb_wc)
             self.fd.close()
             self.file_name = ""
+            self.file_done = False
 
-    def pull_file(self, file_path):
-        pass
-
-    # initiative save file
-    def save_file(self):
+    # passive save file
+    def s_save_file(self):
         self.post_recv(self.file_mr)
         self.post_send(self.msg_mr, m.FILE_BEGIN_MSG)
         while not self.file_done:
             self.poll_cq(callback=self.cb_wc)
         self.fd.close()
         self.file_name = ""
+        self.file_done = False
         self.post_send(self.msg_mr, m.FILE_DONE_MSG)
+
+    def c_pull_file(self, file_path):
+        self.file_name = file_path
+        self.post_recv(self.recv_mr)
+        self.post_write(self.file_mr, file_path, len(file_path),
+                        self.remote_metadata.remote_stag, self.remote_metadata.addr,
+                        e.IBV_WR_RDMA_WRITE_WITH_IMM, imm_data=len(file_path))
+        self.poll_cq(callback=self.cb_wc2)
+        self.s_save_file()
+
+    def s_push_file(self):
+        self.post_recv(self.file_mr)
+        self.poll_cq(callback=self.cb_wc2)
+        self.c_push_file(self.file_name)
+
+    def cb_wc2(self, wc: pyverbs.cq.WC):
+        if wc.status == e.IBV_WC_SUCCESS:
+            if wc.opcode == e.IBV_WC_RECV_RDMA_WITH_IMM:
+                # passive push file
+                size = wc.imm_data
+                file_name = self.file_mr.read(size, 0).decode("UTF-8", "ignore")
+                self.file_name = file_name
+                try:
+                    self.fd = open(file_name)
+                    self.post_send(self.msg_mr, m.FILE_READY_MSG)
+                except Exception as err:
+                    print(err)
+                    self.post_send(self.msg_mr, m.FILE_ERR_MSG)
+            elif wc.opcode & e.IBV_WC_RECV:
+                # initiative pull file
+                msg = self.recv_mr.read(c.BUFFER_SIZE, 0)
+                self.post_recv(self.file_mr)
+                if check_msg(msg, m.FILE_READY_MSG):
+                    self.fd = utils.create_file(self.file_name)
+                elif check_msg(msg, m.FILE_ERR_MSG):
+                    utils.die("file error from server")
+        else:
+            print(wc)
+            utils.die("cb_wc: wc.status is not the success")
 
     def cb_wc(self, wc: pyverbs.cq.WC):
         if wc.status == e.IBV_WC_SUCCESS:
@@ -206,9 +247,9 @@ class SocketNode:
                 else:
                     self.post_recv(self.file_mr)
                     file_name = self.file_mr.read(size, 0).decode("UTF-8", "ignore")
+                    # file_name = "./test/des/test.file" # test
                     self.file_name = file_name
-                    print("init file", file_name)
-                    self.fd = open("./test/des/test.file", "wb+")
+                    self.fd = utils.create_file(file_name)
                     self.post_send(self.msg_mr, m.FILE_READY_MSG)
             elif wc.opcode & e.IBV_WC_RECV:
                 msg = self.recv_mr.read(c.BUFFER_SIZE, 0)
@@ -228,7 +269,7 @@ class SocketNode:
                     return
         else:
             print(wc)
-            die("cb_wc: wc.status is not the success")
+            utils.die("cb_wc: wc.status is not the success")
 
     def close(self):
         self.rdma_ctx.close()

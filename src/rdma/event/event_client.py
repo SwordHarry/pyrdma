@@ -7,7 +7,7 @@ import pyverbs.enums as e
 
 import src.config.config as c
 # common
-from src.common.common import print_info
+from src.common.utils import print_info
 from src.rdma.event.rdma_node import Node
 from src.common.buffer_attr import serialize, deserialize
 # pyverbs

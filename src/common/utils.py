@@ -1,4 +1,6 @@
 # request struct and config
+import os
+
 import pyverbs.enums as e
 import threading
 
@@ -39,3 +41,10 @@ class PollThread(threading.Thread):
 
     def run(self):
         pass
+
+
+def create_file(file_name):
+    dirname = os.path.dirname(file_name)
+    if not os.path.isdir(dirname):
+        os.makedirs(dirname)
+    return open(file_name, "wb+")
