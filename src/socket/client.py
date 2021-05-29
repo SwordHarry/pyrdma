@@ -35,12 +35,12 @@ class SocketClient:
             node.qp2init().qp2rtr(server_metadata_attr).qp2rts()
             # exchange done, write message or push file to buffer
             node.post_recv(node.recv_mr)
-            # self.socket.sendall(m.PUSH_FILE_MSG)
-            # node.c_push_file("./test/src/50M.file")
-            # print("push done exist")
-            self.socket.sendall(m.PULL_FILE_MSG)
-            node.c_pull_file("./test/pull/des/50M.file")
-            print("pull done exist")
+            self.socket.sendall(m.PUSH_FILE_MSG)
+            node.c_push_file("./test/push/src/50M.file")
+            print("push done exist")
+            # self.socket.sendall(m.PULL_FILE_MSG)
+            # node.c_pull_file("./test/pull/des/50M.file")
+            # print("pull done exist")
             # msg = "a message from client"
             # node.post_write(node.file_mr, msg, len(msg), server_metadata_attr.remote_stag, server_metadata_attr.addr)
             # node.poll_cq()

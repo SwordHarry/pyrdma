@@ -20,7 +20,7 @@ from pyverbs.mr import MR
 from pyverbs.pd import PD
 
 
-def check_wc_status(wc):
+def check_wc_status(wc: pyverbs.cq.WC):
     if wc.status != e.IBV_WC_SUCCESS:
         print(wc)
         utils.die("on_completion: status is not IBV_WC_SUCCESS")
@@ -30,6 +30,8 @@ def check_wc_status(wc):
         print("send completed successfully")
     elif wc.opcode == e.IBV_WC_RDMA_WRITE:
         print("write complete")
+    elif wc.opcode == e.IBV_WC_RECV_RDMA_WITH_IMM:
+        print("write with imm_data:", wc.imm_data)
     elif wc.opcode == e.IBV_WC_RDMA_READ:
         print("read complete")
     else:
@@ -119,16 +121,21 @@ class SocketNode:
         return self
 
     # poll cq
-    def poll_cq(self, poll_count=1, callback=check_wc_status):
+    def poll_cq(self, poll_count=1, debug=True):
         self.cq.req_notify()
         npolled = 0
+        wc_list = []
         while npolled < poll_count:
             (one_poll_count, wcs) = self.cq.poll(num_entries=poll_count)
             if one_poll_count > 0:
                 npolled += one_poll_count
                 self.cq.ack_events(one_poll_count)
-                for wc in wcs:
-                    callback(wc)
+                if debug:
+                    for wc in wcs:
+                        # check the wc status, if not success, log the result or die
+                        check_wc_status(wc)
+                wc_list += wcs
+        return wc_list
 
     def post_write(self, mr: MR, data, length, rkey, remote_addr, opcode=e.IBV_WR_RDMA_WRITE, imm_data=0):
         mr.write(data, length)
@@ -174,7 +181,22 @@ class SocketNode:
             self.fd = open(file_path, "rb")
             self.post_recv(self.recv_mr)
             while not self.file_done:
-                self.poll_cq(callback=self.cb_wc)
+                wc = self.poll_cq()[0]
+                if wc.opcode & e.IBV_WC_RECV:
+                    msg = self.recv_mr.read(c.BUFFER_SIZE, 0)
+                    self.post_recv(self.recv_mr)
+                    if check_msg(msg, m.FILE_READY_MSG):
+                        # send next chunk
+                        file_stream = self.fd.read(c.FILE_SIZE)
+                        size = len(file_stream)
+                        self.post_write(self.file_mr, file_stream, size,
+                                        self.remote_metadata.remote_stag, self.remote_metadata.addr,
+                                        opcode=e.IBV_WR_RDMA_WRITE_WITH_IMM, imm_data=size)
+                        print("send next chunk", size)
+                    elif check_msg(msg, m.FILE_DONE_MSG):
+                        print("file done")
+                        # done
+                        self.file_done = True
             self.fd.close()
             self.file_name = ""
             self.file_done = False
@@ -184,94 +206,7 @@ class SocketNode:
         self.post_recv(self.file_mr)
         self.post_send(self.msg_mr, m.FILE_BEGIN_MSG)
         while not self.file_done:
-            self.poll_cq(callback=self.cb_wc)
-        self.fd.close()
-        self.file_name = ""
-        self.file_done = False
-        self.post_send(self.msg_mr, m.FILE_DONE_MSG)
-
-    def c_pull_file(self, file_path):
-        self.file_name = file_path
-        # self.post_recv(self.recv_mr)
-        self.poll_cq()
-        msg = self.recv_mr.read(c.BUFFER_SIZE, 0)
-        if check_msg(msg, m.FILE_BEGIN_MSG):
-            self.fd = utils.create_file("./test/pull/src/pull.txt")
-            self.post_write(self.msg_mr, file_path, len(file_path),
-                            self.remote_metadata.remote_stag, self.remote_metadata.addr,
-                            e.IBV_WR_RDMA_WRITE_WITH_IMM, imm_data=len(file_path))
-            self.post_recv(self.file_mr)
-            while not self.file_done:
-                self.poll_cq(callback=self.cb_wc3)
-            self.file_name = ""
-            self.fd.close()
-        else:
-            print("server file error")
-
-    def s_push_file(self):
-        self.post_recv(self.file_mr)
-        self.post_send(self.msg_mr, m.FILE_BEGIN_MSG)
-        self.poll_cq()
-        self.poll_cq(callback=self.cb_wc2)
-        self.post_recv(self.recv_mr)
-        while not self.file_done:
-            self.poll_cq(callback=self.cb_wc3)
-        self.file_name = ""
-        self.fd.close()
-
-    def cb_wc3(self, wc: pyverbs.cq.WC):
-        if wc.status == e.IBV_WC_SUCCESS:
-            if wc.opcode == e.IBV_WC_RECV_RDMA_WITH_IMM:
-                size = wc.imm_data
-                if size == 0:
-                    print("file done")
-                    self.post_send(self.msg_mr, m.FILE_DONE_MSG)
-                    self.file_done = True
-                else:
-                    print("recv file body", size)
-                    self.post_recv(self.file_mr)
-                    file_stream = self.file_mr.read(size, 0)
-                    self.fd.write(file_stream)
-                    self.post_send(self.msg_mr, m.FILE_READY_MSG)
-            elif wc.opcode & e.IBV_WC_RECV:
-                self.post_recv(self.recv_mr)
-                msg = self.recv_mr.read(c.BUFFER_SIZE, 0)
-                if check_msg(msg, m.FILE_READY_MSG):
-                    # send next chunk
-                    file_stream = self.fd.read(c.FILE_SIZE)
-                    size = len(file_stream)
-                    self.post_write(self.file_mr, file_stream, size,
-                                    self.remote_metadata.remote_stag, self.remote_metadata.addr,
-                                    opcode=e.IBV_WR_RDMA_WRITE_WITH_IMM, imm_data=size)
-                    print("send next chunk", size)
-                elif check_msg(msg, m.FILE_DONE_MSG):
-                    print("file done")
-                    # done
-                    self.file_done = True
-        else:
-            print(wc)
-            utils.die("cb_wc: wc.status is not the success")
-
-    def cb_wc2(self, wc: pyverbs.cq.WC):
-        if wc.status == e.IBV_WC_SUCCESS:
-            if wc.opcode == e.IBV_WC_RECV_RDMA_WITH_IMM:
-                # passive push file
-                size = wc.imm_data
-                file_name = self.file_mr.read(size, 0).decode("UTF-8", "ignore")
-                self.file_name = file_name
-                self.fd = open(file_name, "rb")
-                file_stream = self.fd.read(c.FILE_SIZE)
-                size = len(file_stream)
-                self.post_write(self.file_mr, file_stream, size,
-                                self.remote_metadata.remote_stag, self.remote_metadata.addr,
-                                opcode=e.IBV_WR_RDMA_WRITE_WITH_IMM, imm_data=size)
-                print("has send the first chunk", size)
-        else:
-            print(wc)
-            utils.die("cb_wc: wc.status is not the success")
-
-    def cb_wc(self, wc: pyverbs.cq.WC):
-        if wc.status == e.IBV_WC_SUCCESS:
+            wc = self.poll_cq()[0]
             if wc.opcode == e.IBV_WC_RECV_RDMA_WITH_IMM:
                 # initiative save file
                 size = wc.imm_data
@@ -288,13 +223,68 @@ class SocketNode:
                 else:
                     self.post_recv(self.file_mr)
                     file_name = self.file_mr.read(size, 0).decode("UTF-8", "ignore")
-                    # file_name = "./test/des/test.file" # test
+                    file_name = "./test/push/des/test.file"  # test
                     self.file_name = file_name
                     self.fd = utils.create_file(file_name)
                     self.post_send(self.msg_mr, m.FILE_READY_MSG)
-            elif wc.opcode & e.IBV_WC_RECV:
-                msg = self.recv_mr.read(c.BUFFER_SIZE, 0)
+        self.fd.close()
+        self.file_name = ""
+        self.file_done = False
+        self.post_send(self.msg_mr, m.FILE_DONE_MSG)
+        self.poll_cq()
+
+    def c_pull_file(self, file_path):
+        self.file_name = file_path
+        # self.post_recv(self.recv_mr)
+        self.poll_cq()
+        msg = self.recv_mr.read(c.BUFFER_SIZE, 0)
+        if check_msg(msg, m.FILE_BEGIN_MSG):
+            self.fd = utils.create_file("./test/pull/src/pull.txt")
+            self.post_write(self.msg_mr, file_path, len(file_path),
+                            self.remote_metadata.remote_stag, self.remote_metadata.addr,
+                            e.IBV_WR_RDMA_WRITE_WITH_IMM, imm_data=len(file_path))
+            self.post_recv(self.file_mr)
+            while not self.file_done:
+                wc = self.poll_cq()[0]
+                if wc.opcode == e.IBV_WC_RECV_RDMA_WITH_IMM:
+                    size = wc.imm_data
+                    if size == 0:
+                        print("file done")
+                        self.post_send(self.msg_mr, m.FILE_DONE_MSG)
+                        self.file_done = True
+                    else:
+                        print("recv file body", size)
+                        self.post_recv(self.file_mr)
+                        file_stream = self.file_mr.read(size, 0)
+                        self.fd.write(file_stream)
+                        self.post_send(self.msg_mr, m.FILE_READY_MSG)
+            self.file_name = ""
+            self.fd.close()
+        else:
+            print("server file error")
+
+    def s_push_file(self):
+        self.post_recv(self.file_mr)
+        self.post_send(self.msg_mr, m.FILE_BEGIN_MSG)
+        self.poll_cq()
+        wc = self.poll_cq()[0]
+        if wc.opcode == e.IBV_WC_RECV_RDMA_WITH_IMM:
+            # passive push file
+            size = wc.imm_data
+            file_name = self.file_mr.read(size, 0).decode("UTF-8", "ignore")
+            self.file_name = file_name
+            self.fd = open(file_name, "rb")
+            file_stream = self.fd.read(c.FILE_SIZE)
+            size = len(file_stream)
+            self.post_write(self.file_mr, file_stream, size,
+                            self.remote_metadata.remote_stag, self.remote_metadata.addr,
+                            opcode=e.IBV_WR_RDMA_WRITE_WITH_IMM, imm_data=size)
+        self.post_recv(self.recv_mr)
+        while not self.file_done:
+            wc = self.poll_cq()[0]
+            if wc.opcode & e.IBV_WC_RECV:
                 self.post_recv(self.recv_mr)
+                msg = self.recv_mr.read(c.BUFFER_SIZE, 0)
                 if check_msg(msg, m.FILE_READY_MSG):
                     # send next chunk
                     file_stream = self.fd.read(c.FILE_SIZE)
@@ -302,14 +292,12 @@ class SocketNode:
                     self.post_write(self.file_mr, file_stream, size,
                                     self.remote_metadata.remote_stag, self.remote_metadata.addr,
                                     opcode=e.IBV_WR_RDMA_WRITE_WITH_IMM, imm_data=size)
-                    print("send next chunk", size)
                 elif check_msg(msg, m.FILE_DONE_MSG):
                     print("file done")
                     # done
                     self.file_done = True
-        else:
-            print(wc)
-            utils.die("cb_wc: wc.status is not the success")
+        self.file_name = ""
+        self.fd.close()
 
     def close(self):
         self.rdma_ctx.close()
