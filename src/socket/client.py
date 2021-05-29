@@ -17,38 +17,78 @@ class SocketClient:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     def request(self):
-        print("connect in", self.addr, self.port)
-        self.socket.connect((self.addr, self.port))
-        self.socket.sendall(m.BEGIN_MSG)
-        msg = self.socket.recv(c.BUFFER_SIZE)
+        msg = self._connect_recv_msg()
         node = None
         if msg == m.READY_MSG:
             # use socket to exchange metadata of client
             node = SocketNode(name=self.name)
-            buffer_attr_bytes = serialize(node.buffer_attr)
-            self.socket.sendall(buffer_attr_bytes)
-            # get the metadata from server
-            server_metadata_attr_bytes = self.socket.recv(c.BUFFER_SIZE)
-            server_metadata_attr = deserialize(server_metadata_attr_bytes)
-            print_info("server metadata attr:\n" + str(server_metadata_attr))
+            server_metadata_attr = self._exchange_metadata(node)
+            # qp
+            node.qp2init().qp2rtr(server_metadata_attr).qp2rts()
+            # exchange done, write message or push file to buffer
+            msg = "a message from client"
+            node.post_write(node.file_mr, msg, len(msg), server_metadata_attr.remote_stag, server_metadata_attr.addr)
+            node.poll_cq()
+            node.post_read(node.read_mr, c.BUFFER_SIZE, server_metadata_attr.remote_stag, server_metadata_attr.addr)
+            node.poll_cq()
+            msg = node.read_mr.read(c.BUFFER_SIZE, 0)
+            print(msg)
+        # done
+        node.close()
+        self._close()
+
+    def push_file(self, local_file):
+        msg = self._connect_recv_msg()
+        node = None
+        if msg == m.READY_MSG:
+            # use socket to exchange metadata of client
+            node = SocketNode(name=self.name)
+            server_metadata_attr = self._exchange_metadata(node)
             # qp
             node.qp2init().qp2rtr(server_metadata_attr).qp2rts()
             # exchange done, write message or push file to buffer
             node.post_recv(node.recv_mr)
             self.socket.sendall(m.PUSH_FILE_MSG)
-            node.c_push_file("./test/push/src/50M.file")
+            node.c_push_file(local_file)
             print("push done exist")
-            # self.socket.sendall(m.PULL_FILE_MSG)
-            # node.c_pull_file("./test/pull/des/50M.file")
-            # print("pull done exist")
-            # msg = "a message from client"
-            # node.post_write(node.file_mr, msg, len(msg), server_metadata_attr.remote_stag, server_metadata_attr.addr)
-            # node.poll_cq()
-            # node.post_read(node.read_mr, c.BUFFER_SIZE, server_metadata_attr.remote_stag, server_metadata_attr.addr)
-            # node.poll_cq()
-            # msg = node.read_mr.read(c.BUFFER_SIZE, 0)
-            # print(msg)
         # done
-        self.socket.sendall(m.DONE_MSG)
         node.close()
-        self.socket.close()  # 关闭连接
+        self._close()
+
+    def pull_file(self, remote_file):
+        msg = self._connect_recv_msg()
+        node = None
+        if msg == m.READY_MSG:
+            # use socket to exchange metadata of client
+            node = SocketNode(name=self.name)
+            server_metadata_attr = self._exchange_metadata(node)
+            # qp
+            node.qp2init().qp2rtr(server_metadata_attr).qp2rts()
+            # exchange done, write message or push file to buffer
+            node.post_recv(node.recv_mr)
+            self.socket.sendall(m.PULL_FILE_MSG)
+            node.c_pull_file(remote_file)
+            print("pull done exist")
+        node.close()
+        # done
+        self._close()
+
+    def _exchange_metadata(self, node: SocketNode):
+        buffer_attr_bytes = serialize(node.buffer_attr)
+        self.socket.sendall(buffer_attr_bytes)
+        # get the metadata from server
+        server_metadata_attr_bytes = self.socket.recv(c.BUFFER_SIZE)
+        server_metadata_attr = deserialize(server_metadata_attr_bytes)
+        print_info("server metadata attr:\n" + str(server_metadata_attr))
+        return server_metadata_attr
+
+    def _connect_recv_msg(self):
+        print("connect in", self.addr, self.port)
+        self.socket.connect((self.addr, self.port))
+        self.socket.sendall(m.BEGIN_MSG)
+        msg = self.socket.recv(c.BUFFER_SIZE)
+        return msg
+
+    def _close(self):
+        self.socket.sendall(m.DONE_MSG)
+        self.socket.close()
