@@ -1,8 +1,12 @@
 # request struct and config
 import os
 
+import pyverbs.cq
 import pyverbs.enums as e
-import threading
+
+
+def check_msg(msg, msg2):
+    return msg.decode("UTF-8", "ignore").strip("\x00").encode() == msg2
 
 
 def die(reason):
@@ -16,31 +20,22 @@ def print_info(text=""):
     print("===============================================================")
 
 
-def check_wc_status(wc):
+def check_wc_status(wc: pyverbs.cq.WC):
     if wc.status != e.IBV_WC_SUCCESS:
         print(wc)
         die("on_completion: status is not IBV_WC_SUCCESS")
     if wc.opcode & e.IBV_WC_RECV:
-        print("wc received message")
+        print("received message")
     elif wc.opcode == e.IBV_WC_SEND:
-        print("wc send completed successfully")
+        print("send completed successfully")
     elif wc.opcode == e.IBV_WC_RDMA_WRITE:
-        print("wc rdma_write ok")
+        print("write complete")
+    elif wc.opcode == e.IBV_WC_RECV_RDMA_WITH_IMM:
+        print("write with imm_data:", wc.imm_data)
     elif wc.opcode == e.IBV_WC_RDMA_READ:
-        print("wc rdma_read ok")
+        print("read complete")
     else:
-        die("on_completion: completion isn't a send or a receive")
-
-
-class PollThread(threading.Thread):
-    def __init__(self, context, thread_id=1, on_completion=None):
-        threading.Thread.__init__(self)
-        self.context = context
-        self.threadID = thread_id
-        self.on_completion = on_completion
-
-    def run(self):
-        pass
+        die("completion isn't a send, write, read or a receive")
 
 
 def create_file(file_name):

@@ -2,23 +2,19 @@
 import pyverbs.cm_enums as ce
 import pyverbs.enums as e
 # config
-from pyverbs.wr import SGE, RecvWR, SendWR
-
 import src.config.config as c
 # common
-from src.common.utils import die, check_wc_status
-from src.common.buffer_attr import BufferAttr, serialize
+from src.common.utils import check_wc_status
+from src.common.buffer_attr import BufferAttr
 # pyverbss
 from pyverbs.cmid import CMID, AddrInfo, CMEventChannel
-from pyverbs.qp import QPInitAttr, QPCap, QP, QPAttr
+from pyverbs.qp import QPInitAttr, QPCap
 from pyverbs.mr import MR
 from pyverbs.cq import CompChannel, CQ
 from pyverbs.pd import PD
 
 
 # a common node for server or client
-
-
 class Node:
     def __init__(self, addr, port, is_server=False, options=c.OPTIONS):
         self.options = options

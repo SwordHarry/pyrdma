@@ -1,7 +1,4 @@
 # const
-import os
-
-import pyverbs.cq
 import pyverbs.enums as e
 # config
 from pyverbs.cq import CQ
@@ -14,34 +11,11 @@ import src.common.msg as m
 # common
 from src.common.buffer_attr import BufferAttr
 import src.common.utils as utils
+from src.common.file_attr import FileAttr
 # pyverbs
 from pyverbs.device import Context
 from pyverbs.mr import MR
 from pyverbs.pd import PD
-
-from src.common.file_attr import FileAttr
-
-
-def check_wc_status(wc: pyverbs.cq.WC):
-    if wc.status != e.IBV_WC_SUCCESS:
-        print(wc)
-        utils.die("on_completion: status is not IBV_WC_SUCCESS")
-    if wc.opcode & e.IBV_WC_RECV:
-        print("received message")
-    elif wc.opcode == e.IBV_WC_SEND:
-        print("send completed successfully")
-    elif wc.opcode == e.IBV_WC_RDMA_WRITE:
-        print("write complete")
-    elif wc.opcode == e.IBV_WC_RECV_RDMA_WITH_IMM:
-        print("write with imm_data:", wc.imm_data)
-    elif wc.opcode == e.IBV_WC_RDMA_READ:
-        print("read complete")
-    else:
-        utils.die("completion isn't a send, write, read or a receive")
-
-
-def check_msg(msg, msg2):
-    return msg.decode("UTF-8", "ignore").strip("\x00").encode() == msg2
 
 
 class SocketNode:
@@ -133,7 +107,7 @@ class SocketNode:
                 if debug:
                     for wc in wcs:
                         # check the wc status, if not success, log the result or die
-                        check_wc_status(wc)
+                        utils.check_wc_status(wc)
                 wc_list += wcs
         return wc_list
 
@@ -171,7 +145,7 @@ class SocketNode:
         self.post_recv(self.recv_mr)
         self.poll_cq()
         msg = self.recv_mr.read(c.BUFFER_SIZE, 0)
-        if check_msg(msg, m.FILE_BEGIN_MSG):
+        if utils.check_msg(msg, m.FILE_BEGIN_MSG):
             try:
                 self.file_attr.open(file_path)
             except OSError as err:
@@ -190,7 +164,7 @@ class SocketNode:
                 if wc.opcode & e.IBV_WC_RECV:
                     msg = self.recv_mr.read(c.BUFFER_SIZE, 0)
                     self.post_recv(self.recv_mr)
-                    if check_msg(msg, m.FILE_READY_MSG):
+                    if utils.check_msg(msg, m.FILE_READY_MSG):
                         # send next chunk
                         file_stream = self.file_attr.fd.read(c.FILE_SIZE)
                         size = len(file_stream)
@@ -198,7 +172,7 @@ class SocketNode:
                                         self.remote_metadata.remote_stag, self.remote_metadata.addr,
                                         opcode=e.IBV_WR_RDMA_WRITE_WITH_IMM, imm_data=size)
                         print("send next chunk", size)
-                    elif check_msg(msg, m.FILE_DONE_MSG):
+                    elif utils.check_msg(msg, m.FILE_DONE_MSG):
                         print("file done")
                         # done
                         self.file_attr.done()
@@ -232,7 +206,7 @@ class SocketNode:
                     self.post_send(self.msg_mr, m.FILE_READY_MSG)
             elif wc.opcode & e.IBV_WC_RECV:
                 msg = self.file_mr.read(c.BUFFER_SIZE, 0)
-                if check_msg(msg, m.FILE_ERR_MSG):
+                if utils.check_msg(msg, m.FILE_ERR_MSG):
                     break
         if self.file_attr.fd:
             self.post_send(self.msg_mr, m.FILE_DONE_MSG)
@@ -244,7 +218,7 @@ class SocketNode:
         # self.post_recv(self.recv_mr)
         self.poll_cq()  # post recv
         msg = self.recv_mr.read(c.BUFFER_SIZE, 0)
-        if check_msg(msg, m.FILE_BEGIN_MSG):
+        if utils.check_msg(msg, m.FILE_BEGIN_MSG):
             self.file_attr.fd = utils.create_file("./test/pull/src/pull.txt")
             # self.file_attr.fd = utils.create_file(file_path)
             self.post_write(self.msg_mr, file_path, len(file_path),
@@ -267,7 +241,7 @@ class SocketNode:
                         self.post_send(self.msg_mr, m.FILE_READY_MSG)
                 elif wc.opcode & e.IBV_WC_RECV:
                     msg = self.file_mr.read(c.BUFFER_SIZE, 0)
-                    if check_msg(msg, m.FILE_ERR_MSG):
+                    if utils.check_msg(msg, m.FILE_ERR_MSG):
                         print("server file error")
                         break
             self.file_attr.close()
@@ -300,14 +274,14 @@ class SocketNode:
             if wc.opcode & e.IBV_WC_RECV:
                 self.post_recv(self.recv_mr)
                 msg = self.recv_mr.read(c.BUFFER_SIZE, 0)
-                if check_msg(msg, m.FILE_READY_MSG):
+                if utils.check_msg(msg, m.FILE_READY_MSG):
                     # send next chunk
                     file_stream = self.file_attr.fd.read(c.FILE_SIZE)
                     size = len(file_stream)
                     self.post_write(self.file_mr, file_stream, size,
                                     self.remote_metadata.remote_stag, self.remote_metadata.addr,
                                     opcode=e.IBV_WR_RDMA_WRITE_WITH_IMM, imm_data=size)
-                elif check_msg(msg, m.FILE_DONE_MSG):
+                elif utils.check_msg(msg, m.FILE_DONE_MSG):
                     print("file done")
                     # done
                     self.file_attr.done()
