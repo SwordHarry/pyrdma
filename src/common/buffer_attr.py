@@ -33,12 +33,3 @@ def serialize(buffer_attr) -> bytes:
 def deserialize(b: bytes):
     return pickle.loads(b)
 
-
-class FileAttr:
-    def __init__(self, file_path, name_len):
-        self.file_path = file_path
-        self.name_len = name_len
-
-    def __str__(self):
-        return "file_path: %s;\nname_len: %s;" % \
-               (self.file_path, self.name_len)
